@@ -24,42 +24,44 @@ void handle_signal(int sig);
 
 int main(int argc, char **argv, char **env) {
     sockets_data sockets[MAX_SERVICES];
-    struct sockaddr sa;
+    struct sockaddr_in addr;
 	short int services_count = 0;
 
-    sa.sin_family = AF_INET;
-    sa.sin_addr.s_addr = htonl(INADDR_ANY);
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = INADDR_ANY;
     //...
     for (int i = 0; i < services_count; i++) {
-        short int sockfd = 0;
+        int sockfd = 0;
         int sock_type = 0;
         int sock_proto = 0;
 
-        if (strcmp(sockets[i].protocol, "udp") == 0) {
+        if (strncmp(sockets[i].protocol, "udp", 3) == 0) {
             sock_type = SOCK_DGRAM;
             sock_proto = IPPROTO_UDP;
-        } else if (strcmp(sockets[i].protocol, "tcp") == 0) {
+        } else if (strncmp(sockets[i].protocol, "tcp", 3) == 0) {
             sock_type = SOCK_STREAM;
             sock_proto = IPPROTO_TCP;
         }
-        sockfd = socket(AF_INET, sock_type, sock_proto);    //check slides
+        sockfd = socket(AF_INET, sock_type, sock_proto);
         if (sockfd < 0) {
-            //error management...
+            perror("Error on \"socket\" function");
+            exit(EXIT_FAILURE);
         }
         sockets[i].socket_fd = sockfd;
-        sa.sin_port = htons(strtoi(sockets[i].port));   //check conversion function
-        if (bind(sockfd, &sa, sizeof(sa)) < 0) {
-            //error management...
+        addr.sin_port = htons(atoi(sockets[i].port));
+        if (bind(sockfd, &addr, sizeof(addr)) < 0) {
+            perror("Error on \"bind\" function");
+            exit(EXIT_FAILURE);
         }
-        if (strcmp(sockets[i].protocol, "tcp") == 0) {
+        if (strncmp(sockets[i].protocol, "tcp", 3) == 0) {
             if (listen(sockfd, SOMAXCONN) < 0) {
-                //error management...
+                perror("Error on \"listen\" function");
+                exit(EXIT_FAILURE);
             }
         }
-    }
-		
-	signal(SIGCHLD, handle_signal); /* Handle signals sent by son processes - call this function when it's ought to be */
-	
+    }	
+	signal(SIGCHLD, handle_signal);
+	//...
 	return 0;
 }
 
