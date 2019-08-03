@@ -9,6 +9,7 @@
 #include <errno.h>
 
 #define MAX_SERVICES 10
+fd_set sockfd_set;
 
 typedef struct sockets_data {
     char protocol[3];
@@ -30,6 +31,7 @@ int main(int argc, char **argv, char **env) {
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = INADDR_ANY;
     //...
+    FD_ZERO(&sockfd_set);
     for (int i = 0; i < services_count; i++) {
         int sockfd = 0;
         int sock_type = 0;
@@ -48,6 +50,7 @@ int main(int argc, char **argv, char **env) {
             exit(EXIT_FAILURE);
         }
         sockets[i].socket_fd = sockfd;
+        FD_SET(sockfd, &sockfd_set);
         addr.sin_port = htons(atoi(sockets[i].port));
         if (bind(sockfd, &addr, sizeof(addr)) < 0) {
             perror("Error on \"bind\" function");
