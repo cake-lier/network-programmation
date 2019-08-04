@@ -51,8 +51,8 @@ int main(int argc, char **argv, char **env) {
         }
         sockets[i].socket_fd = sockfd;
         FD_SET(sockfd, &sockfd_set);
-        addr.sin_port = htons(atoi(sockets[i].port));
-        if (bind(sockfd, &addr, sizeof(addr)) < 0) {
+        addr.sin_port = htons(atoi(sockets[i].service_port));
+        if (bind(sockfd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
             perror("Error on \"bind\" function");
             exit(EXIT_FAILURE);
         }
