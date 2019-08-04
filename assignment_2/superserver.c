@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <netinet/in.h>
@@ -9,7 +10,6 @@
 #include <errno.h>
 
 #define MAX_SERVICES 10
-fd_set sockfd_set;
 
 typedef struct sockets_data {
     char protocol[3];
@@ -21,13 +21,14 @@ typedef struct sockets_data {
     int pid;
 } sockets_data;
 
+sockets_data sockets[MAX_SERVICES];
+fd_set sockfd_set;
+short int services_count = 0;
+
 void handle_signal(int sig);
 
 int main(int argc, char **argv, char **env) {
-    sockets_data sockets[MAX_SERVICES];
     struct sockaddr_in addr;
-	short int services_count = 0;
-
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = INADDR_ANY;
     //...
@@ -51,8 +52,8 @@ int main(int argc, char **argv, char **env) {
         }
         sockets[i].socket_fd = sockfd;
         FD_SET(sockfd, &sockfd_set);
-        addr.sin_port = htons(atoi(sockets[i].port));
-        if (bind(sockfd, &addr, sizeof(addr)) < 0) {
+        addr.sin_port = htons(atoi(sockets[i].service_port));
+        if (bind(sockfd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
             perror("Error on \"bind\" function");
             exit(EXIT_FAILURE);
         }
@@ -68,18 +69,24 @@ int main(int argc, char **argv, char **env) {
 	return 0;
 }
 
-// handle_signal implementation
-void handle_signal (int sig) {
-	// Call to wait system-call goes here
-	
-	
+void handle_signal(int sig) {
+	int child_pid, status;
+
+    child_pid = wait(&status);
+    //error handling...
 	switch (sig) {
-		case SIGCHLD : 
-			// Implementation of SIGCHLD handling goes here	
-			
-			
+		case SIGCHLD: 
+			for (int i = 0; i < services_count; i++) {
+                if (sockets[i].pid == child_pid) {
+                    if (strncmp(sockets[i].service_mode, "wait", 4) == 0) {
+                        FD_SET(sockets[i].socket_fd, &sockfd_set);
+                    }
+                    break;
+                }
+            }
 			break;
-		default : printf ("Signal not known!\n");
+		default: 
+            printf("Signal not known!\n");
 			break;
 	}
 }
