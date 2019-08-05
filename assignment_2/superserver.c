@@ -12,9 +12,9 @@
 fd_set sockfd_set;
 
 typedef struct sockets_data {
-    char protocol[3];
-    char service_mode[6];
-    char service_port[5];
+    char *protocol;
+    char *service_mode;
+    char *service_port;
     char *service_path;
     char *service_name;
     int socket_fd;
@@ -30,6 +30,32 @@ int main(int argc, char **argv, char **env) {
 
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = INADDR_ANY;
+
+    //read from file (strange things happen when words are "too long" help)
+    FILE *fp;
+    char* filename = "inetd.txt";                   //filename here
+    if ((fp = fopen(filename, "r")) == NULL){
+        printf("could not open file\n");
+        return 1;
+    }    
+    int i = 0, k = 0;
+    char* words[4];
+    while(feof(fp) == 0){
+        for(k=0; k<4; k++){
+            fscanf(fp, "%s", &words[k]);
+        }
+        sockets[i].service_path = words[0];
+        sockets[i].protocol = words[1];
+        sockets[i].service_port = words[2];
+        sockets[i].service_mode = words[3];
+        i++;
+    }
+    fclose(fp);
+    /*  //test
+    int j = i;
+    for(i=0; i<j; i++){
+        printf("%s %s %s %s\n", &sockets[i].service_path, &sockets[i].protocol, &sockets[i].service_port, &sockets[i].service_mode);
+    }*/
     //...
     FD_ZERO(&sockfd_set);
     for (int i = 0; i < services_count; i++) {
