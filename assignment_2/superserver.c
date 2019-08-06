@@ -9,6 +9,7 @@
 #include <signal.h>
 #include <errno.h>
 #include <stdbool.h>
+#include <unistd.h>
 
 #define MAX_SERVICES 10
 
@@ -30,7 +31,6 @@ void handle_signal(int sig);
 
 int main(int argc, char **argv, char **env) {
     struct sockaddr_in addr;
-    struct sockaddr_in client_addr;
     FILE *fp;
     pid_t pid;
     char* filename = "inetd.txt";
@@ -41,12 +41,13 @@ int main(int argc, char **argv, char **env) {
     addr.sin_addr.s_addr = INADDR_ANY;
     if ((fp = fopen(filename, "r")) == NULL) {
         printf("Could not open configuration file\n");
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
     while (!feof(fp)) {
         char ch;
         char *path;
         char *service_name;
+        char *service;
         int i = 0;
         int path_length = 10;
         int service_length = 0;
@@ -61,7 +62,7 @@ int main(int argc, char **argv, char **env) {
             i++;
             if (i == path_length) {
                 path_length *= 2;
-                path = (char *)realloc(parameters[0], sizeof(char) * path_length);
+                path = (char *)realloc(path, sizeof(char) * path_length);
                 if (path == NULL) {
                     printf("Could not allocate memory\n");
                     exit(EXIT_FAILURE);
@@ -84,8 +85,8 @@ int main(int argc, char **argv, char **env) {
         fgetc(fp);
         fscanf(fp, "%4s", &(sockets[i].service_mode));
         sockets[i].service_mode[4] = '\0';
-        if (strncmp(sockets[i].service_mode, "nowa")) {
-            fscanf(fp, "%2s", &(sockets[i].service_mode + 4));
+        if (strncmp(sockets[i].service_mode, "nowa", 4)) {
+            fscanf(fp, "%2s", &(sockets[i].service_mode) + 4);
         }
         fgetc(fp);
     }
@@ -129,10 +130,11 @@ int main(int argc, char **argv, char **env) {
 	while (true) {
         fd_set read_set;
         int sel_res = 0;
+        int j = 0;
 
         FD_ZERO(&read_set);
         for (int i = 0; i < services_count; i++) {
-            int current_socket = sockets[i].socket;
+            int current_socket = sockets[i].socket_fd;
             if (FD_ISSET(current_socket, &sockfd_set)) {
                 FD_SET(current_socket, &read_set);
             }
@@ -144,13 +146,14 @@ int main(int argc, char **argv, char **env) {
                 exit(EXIT_FAILURE);
                 break;
             default:
-                int j = 0;
                 for (int i = 0; i < services_count && j < sel_res; i++) {
-                    if (FD_ISSET(sockets[i].socket_fd, &readSet)) {
+                    if (FD_ISSET(sockets[i].socket_fd, &read_set)) {
                         int newSock = 0;
+                        struct sockaddr_in client_addr;
+                        socklen_t client_size;
                         j++;
                         if (strncmp(sockets[i].protocol, "tcp", 3) == 0){
-                            newSock = accept(sockets[i].socket_fd, (struct sockaddr *)&client_addr, sizeof(client_addr));
+                            newSock = accept(sockets[i].socket_fd, (struct sockaddr *)&client_addr, &client_size);
                             if (newSock < 0) {
                                 perror("Error on \"accept\" function");
                                 exit(EXIT_FAILURE);
@@ -167,7 +170,7 @@ int main(int argc, char **argv, char **env) {
                             }
                             if (strncmp(sockets[i].service_mode, "wait", 4) == 0) {
                                 sockets[i].pid = pid;
-                                FD_UNSET(sockets[i].socket_fd, &sockfd_set);
+                                FD_CLR(sockets[i].socket_fd, &sockfd_set);
                             }
                         //son process
                         } else if (pid == 0) {
