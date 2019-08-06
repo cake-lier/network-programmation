@@ -7,14 +7,15 @@
 #include <netinet/in.h>
 #include <signal.h>
 #include <errno.h>
+#include <stdbool.h>
 
 #define MAX_SERVICES 10
 fd_set sockfd_set;
 
 typedef struct sockets_data {
-    char *protocol;
-    char *service_mode;
-    char *service_port;
+    char protocol[4];
+    char service_mode[7];
+    char service_port[6];
     char *service_path;
     char *service_name;
     int socket_fd;
@@ -26,38 +27,66 @@ void handle_signal(int sig);
 int main(int argc, char **argv, char **env) {
     sockets_data sockets[MAX_SERVICES];
     struct sockaddr_in addr;
+    struct sockaddr_in client_addr;
+    FILE *fp;
+    pid_t pid;
+    char* filename = "inetd.txt";
 	short int services_count = 0;
     int maxfd = -1;
 
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = INADDR_ANY;
+    if ((fp = fopen(filename, "r")) == NULL) {
+        printf("Could not open configuration file\n");
+        return EXIT_FAILURE;
+    }
+    while (!feof(fp)) {
+        char ch;
+        char *path;
+        char *service_name;
+        int i = 0;
+        int path_length = 10;
+        int service_length = 0;
 
-    //read from file (strange things happen when words are "too long" help)
-    FILE *fp;
-    char* filename = "inetd.txt";                   //filename here
-    if ((fp = fopen(filename, "r")) == NULL){
-        printf("could not open file\n");
-        return 1;
-    }    
-    int i = 0, k = 0;
-    char* words[4];
-    while(feof(fp) == 0){
-        for(k=0; k<4; k++){
-            fscanf(fp, "%s", &words[k]);
+        path = (char *)malloc(sizeof(char) * path_length);
+        if (path == NULL) {
+            printf("Could not allocate memory\n");
+            exit(EXIT_FAILURE);
         }
-        sockets[i].service_path = words[0];
-        sockets[i].protocol = words[1];
-        sockets[i].service_port = words[2];
-        sockets[i].service_mode = words[3];
-        i++;
+        while ((ch = fgetc(fp)) != ' ') {
+            path[i] = ch;
+            i++;
+            if (i == path_length) {
+                path_length *= 2;
+                path = (char *)realloc(parameters[0], sizeof(char) * path_length);
+                if (path == NULL) {
+                    printf("Could not allocate memory\n");
+                    exit(EXIT_FAILURE);
+                }
+            }
+        }
+        path[i] = '\0';
+        sockets[i].service_path = path;
+        service_name = strrchr(path, '\\');
+        service_length = strlen(service_name);
+        service = (char *)malloc(sizeof(char) * service_length);
+        if (service == NULL) {
+            printf("Could not allocate memory\n");
+            exit(EXIT_FAILURE);
+        }
+        strncpy(service, service_name, service_length);
+        fscanf(fp, "%3s", &(sockets[i].protocol));
+        fgetc(fp);
+        fscanf(fp, "%5s", &(sockets[i].service_port));
+        fgetc(fp);
+        fscanf(fp, "%4s", &(sockets[i].service_mode));
+        sockets[i].service_mode[4] = '\0';
+        if (strncmp(sockets[i].service_mode, "nowa")) {
+            fscanf(fp, "%2s", &(sockets[i].service_mode + 4));
+        }
+        fgetc(fp);
     }
     fclose(fp);
-    /*  //test
-    int j = i;
-    for(i=0; i<j; i++){
-        printf("%s %s %s %s\n", &sockets[i].service_path, &sockets[i].protocol, &sockets[i].service_port, &sockets[i].service_mode);
-    }*/
-    //...
     FD_ZERO(&sockfd_set);
     for (int i = 0; i < services_count; i++) {
         int sockfd = 0;
@@ -94,7 +123,7 @@ int main(int argc, char **argv, char **env) {
         }
     }	
 	signal(SIGCHLD, handle_signal);
-	while (1) {
+	while (true) {
         fd_set read_set;
         int sel_res = 0;
 
@@ -106,16 +135,16 @@ int main(int argc, char **argv, char **env) {
             }
         }
         sel_res = select(maxfd, &read_set, NULL, NULL, NULL);
-        switch(sel_res) {
+        switch (sel_res) {
             case -1:
                 perror("Error on \"select\" function");
+                exit(EXIT_FAILURE);
                 break;
             default:
                 int j = 0;
                 for (int i = 0; i < services_count && j < sel_res; i++) {
                     if (FD_ISSET(sockets[i].socket_fd, &readSet)) {
                         int newSock = 0;
-                        struct sockaddr_in client_addr;
                         j++;
                         if (strncmp(sockets[i].protocol, "tcp", 3) == 0){
                             newSock = accept(sockets[i].socket_fd, (struct sockaddr *)&client_addr, sizeof(client_addr));
@@ -124,10 +153,46 @@ int main(int argc, char **argv, char **env) {
                                 exit(EXIT_FAILURE);
                             }
                         }
-                        if (fork() == 0) {
-                            //do something
+                        pid = fork();
+                        //father process
+                        if (pid > 0) {
+                            if (strncmp(sockets[i].protocol, "tcp", 3) == 0) {
+                                if (close(newSock) == -1) {
+                                    perror("Error while closing the connected socket\n");
+                                    exit(EXIT_FAILURE);
+                                }
+                            }
+                            if (strncmp(sockets[i].service_mode, "wait", 4) == 0) {
+                                sockets[i].pid = pid;
+                                FD_UNSET(sockets[i].socket_fd, &sockfd_set);
+                            }
+                        //son process
+                        } else if (pid == 0) {
+                            //close stdin, stdout, stderr
+                            close(0);
+                            close(1);
+                            close(2);
+                            int tmp_sock = sockets[i].socket_fd;
+                            //check if TCP; if so, close welcome socket
+                            if (strncmp(sockets[i].protocol, "tcp", 3) == 0) {
+                                if(close(sockets[i].socket_fd) == -1){
+                                    perror("Error while closing the connected socket\n");
+                                    exit(EXIT_FAILURE);
+                                }
+                                tmp_sock = newSock;
+                            }
+                            //associate sock_fd to stdin, stdout, stderr
+                            for(int i = 0; i < 3; i++){
+                                if(dup(tmp_sock) == -1){
+                                    perror("Error on dup(fd)\n");
+                                    exit(EXIT_FAILURE);
+                                }
+                            }
+                            //execute service
+                            execle(sockets[i].service_path, sockets[i].service_name, env);
                         } else {
-                            //do something else
+                            perror("Error on \"fork\" function");
+                            exit(EXIT_FAILURE);
                         }
                     }
                 }
