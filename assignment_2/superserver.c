@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <netinet/in.h>
@@ -10,7 +11,6 @@
 #include <stdbool.h>
 
 #define MAX_SERVICES 10
-fd_set sockfd_set;
 
 typedef struct sockets_data {
     char protocol[4];
@@ -22,10 +22,13 @@ typedef struct sockets_data {
     int pid;
 } sockets_data;
 
+sockets_data sockets[MAX_SERVICES];
+fd_set sockfd_set;
+short int services_count = 0;
+
 void handle_signal(int sig);
 
 int main(int argc, char **argv, char **env) {
-    sockets_data sockets[MAX_SERVICES];
     struct sockaddr_in addr;
     struct sockaddr_in client_addr;
     FILE *fp;
@@ -102,7 +105,7 @@ int main(int argc, char **argv, char **env) {
         }
         sockfd = socket(AF_INET, sock_type, sock_proto);
         if (sockfd < 0) {
-            perror("Error on \"socket\" function");
+            perror("Error in \"socket\" function");
             exit(EXIT_FAILURE);
         }
         if (maxfd < sockfd) {
@@ -112,12 +115,12 @@ int main(int argc, char **argv, char **env) {
         FD_SET(sockfd, &sockfd_set);
         addr.sin_port = htons(atoi(sockets[i].service_port));
         if (bind(sockfd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
-            perror("Error on \"bind\" function");
+            perror("Error in \"bind\" function");
             exit(EXIT_FAILURE);
         }
         if (strncmp(sockets[i].protocol, "tcp", 3) == 0) {
             if (listen(sockfd, SOMAXCONN) < 0) {
-                perror("Error on \"listen\" function");
+                perror("Error in \"listen\" function");
                 exit(EXIT_FAILURE);
             }
         }
@@ -202,18 +205,27 @@ int main(int argc, char **argv, char **env) {
 	return 0;
 }
 
-// handle_signal implementation
-void handle_signal (int sig) {
-	// Call to wait system-call goes here
-	
-	
+void handle_signal(int sig) {
+	int child_pid, status;
+
+    child_pid = wait(&status);
+    if (child_pid == -1) {
+        perror("Error in \"wait\" function");
+        exit(EXIT_FAILURE);
+    }
 	switch (sig) {
-		case SIGCHLD : 
-			// Implementation of SIGCHLD handling goes here	
-			
-			
+		case SIGCHLD: 
+			for (int i = 0; i < services_count; i++) {
+                if (sockets[i].pid == child_pid) {
+                    if (strncmp(sockets[i].service_mode, "wait", 4) == 0) {
+                        FD_SET(sockets[i].socket_fd, &sockfd_set);
+                    }
+                    break;
+                }
+            }
 			break;
-		default : printf ("Signal not known!\n");
+		default: 
+            printf("Signal not known!\n");
 			break;
 	}
 }
