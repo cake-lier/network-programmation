@@ -27,6 +27,7 @@ int main(int argc, char **argv, char **env) {
     sockets_data sockets[MAX_SERVICES];
     struct sockaddr_in addr;
 	short int services_count = 0;
+    int maxfd = -1;
 
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = INADDR_ANY;
@@ -49,6 +50,9 @@ int main(int argc, char **argv, char **env) {
             perror("Error on \"socket\" function");
             exit(EXIT_FAILURE);
         }
+        if (maxfd < sockfd) {
+            maxfd = sockfd;
+        }
         sockets[i].socket_fd = sockfd;
         FD_SET(sockfd, &sockfd_set);
         addr.sin_port = htons(atoi(sockets[i].service_port));
@@ -64,7 +68,46 @@ int main(int argc, char **argv, char **env) {
         }
     }	
 	signal(SIGCHLD, handle_signal);
-	//...
+	while (1) {
+        fd_set read_set;
+        int sel_res = 0;
+
+        FD_ZERO(&read_set);
+        for (int i = 0; i < services_count; i++) {
+            int current_socket = sockets[i].socket;
+            if (FD_ISSET(current_socket, &sockfd_set)) {
+                FD_SET(current_socket, &read_set);
+            }
+        }
+        sel_res = select(maxfd, &read_set, NULL, NULL, NULL);
+        switch(sel_res) {
+            case -1:
+                perror("Error on \"select\" function");
+                break;
+            default:
+                int j = 0;
+                for (int i = 0; i < services_count && j < sel_res; i++) {
+                    if (FD_ISSET(sockets[i].socket_fd, &readSet)) {
+                        int newSock = 0;
+                        struct sockaddr_in client_addr;
+                        j++;
+                        if (strncmp(sockets[i].protocol, "tcp", 3) == 0){
+                            newSock = accept(sockets[i].socket_fd, (struct sockaddr *)&client_addr, sizeof(client_addr));
+                            if (newSock < 0) {
+                                perror("Error on \"accept\" function");
+                                exit(EXIT_FAILURE);
+                            }
+                        }
+                        if (fork() == 0) {
+                            //do something
+                        } else {
+                            //do something else
+                        }
+                    }
+                }
+                break;
+        }
+    }
 	return 0;
 }
 
