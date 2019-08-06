@@ -47,19 +47,19 @@ int main(int argc, char **argv, char **env) {
         }
         sockfd = socket(AF_INET, sock_type, sock_proto);
         if (sockfd < 0) {
-            perror("Error on \"socket\" function");
+            perror("Error in \"socket\" function");
             exit(EXIT_FAILURE);
         }
         sockets[i].socket_fd = sockfd;
         FD_SET(sockfd, &sockfd_set);
         addr.sin_port = htons(atoi(sockets[i].service_port));
         if (bind(sockfd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
-            perror("Error on \"bind\" function");
+            perror("Error in \"bind\" function");
             exit(EXIT_FAILURE);
         }
         if (strncmp(sockets[i].protocol, "tcp", 3) == 0) {
             if (listen(sockfd, SOMAXCONN) < 0) {
-                perror("Error on \"listen\" function");
+                perror("Error in \"listen\" function");
                 exit(EXIT_FAILURE);
             }
         }
@@ -73,7 +73,10 @@ void handle_signal(int sig) {
 	int child_pid, status;
 
     child_pid = wait(&status);
-    //error handling...
+    if (child_pid == -1) {
+        perror("Error in \"wait\" function");
+        exit(EXIT_FAILURE);
+    }
 	switch (sig) {
 		case SIGCHLD: 
 			for (int i = 0; i < services_count; i++) {
