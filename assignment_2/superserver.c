@@ -33,9 +33,9 @@ int main(int argc, char **argv, char **env) {
     struct sockaddr_in addr;
     FILE *fp;
     pid_t pid;
+    char ch;
     char* filename = "inetd.txt";
 	short int services_count = 0;
-    int maxfd = -1;
 
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = INADDR_ANY;
@@ -43,11 +43,10 @@ int main(int argc, char **argv, char **env) {
         printf("Could not open configuration file\n");
         exit(EXIT_FAILURE);
     }
-    while (!feof(fp)) {
-        char ch;
+    ch = fgetc(fp);
+    while (ch != EOF) {
         char *path;
         char *service_name;
-        char *service;
         int i = 0;
         int path_length = 10;
         int service_length = 0;
@@ -57,7 +56,7 @@ int main(int argc, char **argv, char **env) {
             printf("Could not allocate memory\n");
             exit(EXIT_FAILURE);
         }
-        while ((ch = fgetc(fp)) != ' ') {
+        do {
             path[i] = ch;
             i++;
             if (i == path_length) {
@@ -68,27 +67,29 @@ int main(int argc, char **argv, char **env) {
                     exit(EXIT_FAILURE);
                 }
             }
-        }
+        } while ((ch = fgetc(fp)) != ' ');
         path[i] = '\0';
-        sockets[i].service_path = path;
-        service_name = strrchr(path, '\\');
+        sockets[services_count].service_path = path;
+        service_name = strrchr(path, '/') + 1;
         service_length = strlen(service_name);
-        service = (char *)malloc(sizeof(char) * service_length);
-        if (service == NULL) {
+        sockets[services_count].service_name = (char *)malloc(sizeof(char) * service_length);
+        if (sockets[services_count].service_name == NULL) {
             printf("Could not allocate memory\n");
             exit(EXIT_FAILURE);
         }
-        strncpy(service, service_name, service_length);
-        fscanf(fp, "%3s", &(sockets[i].protocol));
+        strncpy(sockets[services_count].service_name, service_name, service_length);
+        fscanf(fp, "%3s", (char *)&(sockets[services_count].protocol));
         fgetc(fp);
-        fscanf(fp, "%5s", &(sockets[i].service_port));
+        fscanf(fp, "%5s", (char *)&(sockets[services_count].service_port));
         fgetc(fp);
-        fscanf(fp, "%4s", &(sockets[i].service_mode));
-        sockets[i].service_mode[4] = '\0';
-        if (strncmp(sockets[i].service_mode, "nowa", 4)) {
-            fscanf(fp, "%2s", &(sockets[i].service_mode) + 4);
+        fscanf(fp, "%4s", (char *)&(sockets[services_count].service_mode));
+        sockets[services_count].service_mode[4] = '\0';
+        if (strncmp(sockets[services_count].service_mode, "nowa", 4) == 0) {
+            fscanf(fp, "%2s", (char *)&(sockets[services_count].service_mode) + 4);
         }
         fgetc(fp);
+        services_count++;
+        ch = fgetc(fp);
     }
     fclose(fp);
     FD_ZERO(&sockfd_set);
@@ -109,9 +110,6 @@ int main(int argc, char **argv, char **env) {
             perror("Error in \"socket\" function");
             exit(EXIT_FAILURE);
         }
-        if (maxfd < sockfd) {
-            maxfd = sockfd;
-        }
         sockets[i].socket_fd = sockfd;
         FD_SET(sockfd, &sockfd_set);
         addr.sin_port = htons(atoi(sockets[i].service_port));
@@ -125,21 +123,25 @@ int main(int argc, char **argv, char **env) {
                 exit(EXIT_FAILURE);
             }
         }
-    }	
+    }
 	signal(SIGCHLD, handle_signal);
 	while (true) {
         fd_set read_set;
         int sel_res = 0;
         int j = 0;
+        int maxfd_curr = -1;
 
         FD_ZERO(&read_set);
         for (int i = 0; i < services_count; i++) {
             int current_socket = sockets[i].socket_fd;
             if (FD_ISSET(current_socket, &sockfd_set)) {
                 FD_SET(current_socket, &read_set);
+                if (maxfd_curr < current_socket) {
+                		maxfd_curr = current_socket;
+                }
             }
         }
-        sel_res = select(maxfd, &read_set, NULL, NULL, NULL);
+        sel_res = select(maxfd_curr + 1, &read_set, NULL, NULL, NULL);
         switch (sel_res) {
             case -1:
                 perror("Error on \"select\" function");
@@ -217,7 +219,7 @@ void handle_signal(int sig) {
         exit(EXIT_FAILURE);
     }
 	switch (sig) {
-		case SIGCHLD: 
+		case SIGCHLD:
 			for (int i = 0; i < services_count; i++) {
                 if (sockets[i].pid == child_pid) {
                     if (strncmp(sockets[i].service_mode, "wait", 4) == 0) {
@@ -227,7 +229,7 @@ void handle_signal(int sig) {
                 }
             }
 			break;
-		default: 
+		default:
             printf("Signal not known!\n");
 			break;
 	}
