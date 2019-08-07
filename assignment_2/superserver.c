@@ -27,10 +27,13 @@ sockets_data sockets[MAX_SERVICES];
 fd_set sockfd_set;
 short int services_count = 0;
 
+//function called when process receives SIGCHILD signal
 void handle_signal(int sig);
 
 int main(int argc, char **argv, char **env) {
     struct sockaddr_in addr;
+
+    // read services data from inetd.txt and save in struct
     FILE *fp;
     pid_t pid;
     char ch;
@@ -91,6 +94,8 @@ int main(int argc, char **argv, char **env) {
         ch = fgetc(fp);
     }
     fclose(fp);
+
+    //initialize sockfd_set
     FD_ZERO(&sockfd_set);
     for (int i = 0; i < services_count; i++) {
         int sockfd = 0;
@@ -123,6 +128,8 @@ int main(int argc, char **argv, char **env) {
             }
         }
     }
+
+    //
 	signal(SIGCHLD, handle_signal);
 	while (true) {
         fd_set read_set;
