@@ -35,7 +35,6 @@ int main(int argc, char **argv, char **env) {
     pid_t pid;
     char ch;
     char* filename = "inetd.txt";
-	short int services_count = 0;
 
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = INADDR_ANY;
@@ -131,17 +130,21 @@ int main(int argc, char **argv, char **env) {
         int j = 0;
         int maxfd_curr = -1;
 
-        FD_ZERO(&read_set);
-        for (int i = 0; i < services_count; i++) {
-            int current_socket = sockets[i].socket_fd;
-            if (FD_ISSET(current_socket, &sockfd_set)) {
-                FD_SET(current_socket, &read_set);
-                if (maxfd_curr < current_socket) {
-                		maxfd_curr = current_socket;
-                }
-            }
-        }
-        sel_res = select(maxfd_curr + 1, &read_set, NULL, NULL, NULL);
+        do {
+        	//initialize fd set before select()
+        	FD_ZERO(&read_set);
+            for (int i = 0; i < services_count; i++) {
+        	    int current_socket = sockets[i].socket_fd;
+        	    if (FD_ISSET(current_socket, &sockfd_set)) {
+        	        FD_SET(current_socket, &read_set);
+        	        if (maxfd_curr < current_socket) {
+        	            maxfd_curr = current_socket;
+        	        }
+        	    }
+        	}
+            sel_res = select(maxfd_curr + 1, &read_set, NULL, NULL, NULL);
+        //if select is interrupted by a signal (errno == EINTR) go back to select
+        } while (sel_res == -1 && errno == EINTR);
         switch (sel_res) {
             case -1:
                 perror("Error on \"select\" function");
@@ -152,7 +155,7 @@ int main(int argc, char **argv, char **env) {
                     if (FD_ISSET(sockets[i].socket_fd, &read_set)) {
                         int newSock = 0;
                         struct sockaddr_in client_addr;
-                        socklen_t client_size;
+                        socklen_t client_size = sizeof(client_addr);
                         j++;
                         if (strncmp(sockets[i].protocol, "tcp", 3) == 0){
                             newSock = accept(sockets[i].socket_fd, (struct sockaddr *)&client_addr, &client_size);
