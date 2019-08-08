@@ -131,19 +131,19 @@ int main(int argc, char **argv, char **env) {
         int maxfd_curr = -1;
 
         do {
-        		//initialize fd set before select()
-        		FD_ZERO(&read_set);
-        	    for (int i = 0; i < services_count; i++) {
-        	    		int current_socket = sockets[i].socket_fd;
-        	        if (FD_ISSET(current_socket, &sockfd_set)) {
-        	        		FD_SET(current_socket, &read_set);
-        	            if (maxfd_curr < current_socket) {
-        	            		maxfd_curr = current_socket;
-        	            }
+			//initialize fd set before select()
+			FD_ZERO(&read_set);
+			for (int i = 0; i < services_count; i++) {
+				int current_socket = sockets[i].socket_fd;
+				if (FD_ISSET(current_socket, &sockfd_set)) {
+        	        FD_SET(current_socket, &read_set);
+        	        if (maxfd_curr < current_socket) {
+        	            maxfd_curr = current_socket;
         	        }
-        	    	}
-        	    	sel_res = select(maxfd_curr + 1, &read_set, NULL, NULL, NULL);
-        	    	//if select is interrupted by a signal (errno == EINTR) go back to select
+        	    }
+        	}
+        	sel_res = select(maxfd_curr + 1, &read_set, NULL, NULL, NULL);
+        	//if select is interrupted by a signal (errno == EINTR) go back to select
         } while (sel_res == -1 && errno == EINTR);
         switch (sel_res) {
             case -1:
