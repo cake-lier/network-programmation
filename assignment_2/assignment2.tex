@@ -21,9 +21,11 @@
 
 \chapter{Task Uno}
 
+\newpage
+
 \begin{figure}[H]
 	\centering
-	\includegraphics[width=\linewidth]{images/diagram.png}
+	\includegraphics[width=\textwidth,height=\textheight,keepaspectratio]{images/diagram.png}
 	\caption{Diagramma di flusso seguito nel programma scritto}
 \end{figure}
 
@@ -63,46 +65,84 @@ un commento che ne espliciti il funzionamento.
 
 \section{Compilazione del ``\textit{superserver}"}
 
-È stato utilizzato il ``\textit{Makefile}" incluso assieme agli altri file di questo assignment.
+È stato utilizzato il ``\textit{Makefile}" incluso assieme agli altri file di questo assignment, che in pratica non fa altro che lanciare il comando ``gcc superserver.c
+-o superserver".
 
 \section{Descrizione dei test effettuati per controllare il comportamento del ``\textit{superserver}"}
 
-.Compilazione di tutti i file sorgente, come specificato sopra
-		.Esecuzione da terminale del superserver
-		.Per ogni test (udp wait e nowait, tcp wait e nowait) esecuzione di 2 processi client
-		.Uso del comando bash "ps -aux" per visualizzare i processi in esecuzione,
-		 per osservare il numero di processi attivi dei server avviati dal superserver
-		.L'indirizzo IP passato come argomento all'esecuzione del processo client adottato è 
-		 l'indirizzo di loopback 127.0.0.1 (identificato tramite il comando ifconfig)
-		.Il numero di porta passato come argomento all'esecuzione del processo client
-		 deve corrispondere alle indicazioni del file inetd.txt
+Inizialmente sono stati compilati tutti i file sorgente, sia del ``\textit{superserver}" che quelli fornitici per ragioni di test.
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\linewidth]{images/gcc.JPG}
+	\caption{Compilazione dei sorgenti necessari ai test}
+\end{figure}
+
+Sono stati posti nella stessa cartella dell'eseguibile del ``\textit{superserver}" i file eseguibili ottenuti da ``tcpServer.c" e da ``udpServer.c", nonchè il file di
+configurazione. Nel file di configurazione sono stati specificati quattro servizi, due con protocollo \textit{TCP} e due con protocollo \textit{UDP}, ciascuno dei quali
+ha come modalità specificata ``wait" oppure ``nowait" così da poter testare entrambi i protocolli in entrambe le modalità. È stato poi eseguito da terminale l'eseguibile
+del ``\textit{superserver}". Per ciascuno dei quattro test, uno per servizio, sono stati eseguiti due processi \textit{client} come richiesto. Nel frattempo, in ciascuno
+dei test, è stato tenuto aperto un terminale dove veniva eseguito il comando \textit{BASH} ``ps -aux" per visualizzare i processi correntemente in esecuzione ed osservare
+quindi il numero di processi attivi dei \textit{server} avviati dal ``\textit{superserver}" stesso.
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\linewidth]{images/launch_superserver.JPG}
+	\caption{Esecuzione dell'eseguibile del ``\textit{superserver}" nonchè del comando ``ps -aux"}
+\end{figure}
+
+Per ogni \textit{client}, l'indirizzo \textit{IP} passato come argomento all'esecuzione dello stesso è 
+stato l'indirizzo di ``\textit{loopback}" 127.0.0.1, ricavato tramite il comando ``ifconfig". Il numero di porta passato come argomento all'esecuzione del processo client
+invece è stato scelto di volta in volta diverso tra i vari test, in modo da corrispondere alle indicazioni del file di configurazione ``inetd.txt".
 
 \section{Comportamento del ``\textit{superserver}"}
 
-1) what's the behaviour of udpServer in wait mode? and in no wait mode?
-		
-			udpServer, wait: è in esecuzione un solo server udp, che è in grado di
-			comunicare con diversi client, in quanto il server attende il completamento
-			dell'operazione corrente prima di iniziarne una nuova; il server quindi
-			adempie le richieste di molteplici client in modo sequenziale tramite
-			un unico processo.
-			
-			udpServer, nowait: in questo caso, se più di un client si connette al server,
-			il server crea molteplici processi al fine di soddisfare le richieste
-			di ogni client.
-			
-		2) what's the behaviour of tcpServer in wait mode? and in no wait mode?
-			
-			tcpServer, wait: quando più client tentano di connettersi al server, esso
-			interagisce con un client alla volta; a differenza del server udp,
-			poichè il protocollo udp necessita dell'instaurazione di una connessione
-			con un client, il server non può interagire con altri client finchè ha una
-			connessione attiva, pertanto il server crea un solo processo.
-			Infatti dopo la terminazione del primo processo client, il server si connette
-			al secondo ed esegue le richieste di quest'ultimo.
-		
-			tcpServer, nowait: il server quando riceve molteplici richieste di connessione da
-			parte di diversi client crea un processo per ogni client, così da poter
-			interagire con essi contemporaneamente.
+\begin{enumerate}
+	\item Qual è il comportamento di ``udpServer"?
+	\begin{itemize}
+		\item Wait mode: è in esecuzione un solo ``udpServer", ma che è in grado di comunicare con entrambi i client contemporaneamente. Questo perchè il protocollo UDP è
+		\textit{connectionless} e ogni pacchetto che arriva fa vita a sè stante, cioè la \textit{socket UDP} non è identificata da informazioni come chi può mandare certi
+		pacchetti a quella  \textit{socket}. Il fatto che sia presente una sola istanza del processo \textit{server UDP} è perchè il server attende il completamento
+		dell'operazione corrente prima di iniziarne una nuova tramite un nuovo processo, portandolo ad adempire le richieste di molteplici client in modo sequenziale tramite
+		un unico processo.
+		\begin{figure}[H]
+			\centering
+			\includegraphics[width=\linewidth]{images/launch_udpClientWait.JPG}
+			\caption{Test del \textit{server UDP} in modalità ``wait"}
+		\end{figure}
+		\item Nowait mode: in questo caso, l'unica differenza riscontraat è che se più di un client si connettono al server, il server crea molteplici processi al fine di
+		soddisfare le richieste di ogni client concorrentemente, così come indicato dal tipo di modalità, cioè ``nowait".
+		\begin{figure}[H]
+			\centering
+			\includegraphics[width=\linewidth]{images/launch_udpClientNowait.JPG}
+			\caption{Test del \textit{server UDP} in modalità ``nowait"}
+		\end{figure}
+	\end{itemize}
+	\item Qual è il comportamento di ``tcpServer"?
+	\begin{itemize}
+		\item Wait mode: quando più client tentano di connettersi al server, esso interagisce con un solo client alla volta; a differenza di \textit{UDP},
+		poichè è \textit{connection-oriented}, il protocollo \textit{TCP} necessita dell'instaurazione di una connessione con un \textit{client} per potervi comunicare.
+		Il \textit{server TCP} perciò non può interagire con altri client finchè ha una connessione attiva perchè attraverso essa riceve esclusivamente i pacchetti da uno
+		specifico \textit{client} e nessun altro, al contrario di come avevamo visto per il \textit{server UDP}. Anche in questo caso, il \textit{server TCP} crea un solo
+		processo e dopo la terminazione del primo processo \textit{client}, il \textit{server} si connette al secondo ed esegue le richieste di quest'ultimo e così via.
+		\begin{figure}[H]
+			\centering
+			\includegraphics[width=\linewidth]{images/launch_tcpClientWait.JPG}
+			\caption{Test del \textit{server TCP} in modalità ``wait" all'inizio}
+		\end{figure}
+		\begin{figure}[H]
+			\centering
+			\includegraphics[width=\linewidth]{images/launch_tcpClientWait_2.JPG}
+			\caption{Test del \textit{server TCP} in modalità ``wait" dopo la chiusura della connessione con il primo \textit{client}}
+		\end{figure}
+		\item Nowait mode: quando il \textit{server TCP} riceve molteplici richieste di connessione da parte di diversi client crea un processo per ogni client, così da
+		poter interagire con essi contemporaneamente, in osservanza alla modalità concorrente scelta.
+		\begin{figure}[H]
+			\centering
+			\includegraphics[width=\linewidth]{images/launch_tcpClientNowait.JPG}
+			\caption{Test del \textit{server TCP} in modalità ``nowait"}
+		\end{figure}
+	\end{itemize}
+\end{enumerate}
 
 \end{document}
