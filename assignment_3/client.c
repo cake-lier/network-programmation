@@ -10,6 +10,18 @@
 
 #define MAX_BUF_SIZE 1024
 
+typedef enum message_type{
+	RTT,
+	THPUT
+} message_type;
+
+typedef struct hello_msg{
+	message_type type;
+	int n_probes;
+	int msg_size;
+	int server_delay;
+} hello_msg;
+
 int main(int argc, char *argv[]){
 	struct sockaddr_in server_addr; // struct containing server address information
 	struct sockaddr_in client_addr; // struct containing client address information
@@ -21,6 +33,8 @@ int main(int argc, char *argv[]){
 	socklen_t serv_size;
 	char received_data[MAX_BUF_SIZE]; // Data to be received
 	char send_data[MAX_BUF_SIZE]; // Data to be sent
+
+	hello_msg hello;
 
 	sfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (sfd < 0){
@@ -36,6 +50,30 @@ int main(int argc, char *argv[]){
 		exit(EXIT_FAILURE);
 	}
 	//...
+
+	// stdin
+    printf("Specify whether you want to measure RTT [0] or THROUGHPUT [1]\n");
+    scanf("%d", &hello.type);
+
+    printf("Specify desired number of probes\n");
+    scanf("%d", &hello.n_probes);
+
+    printf("Specify the number of bytes contained in the probe's payload\n");
+    scanf("%d", &hello.msg_size);
+
+    printf("Specify desired server delay\n");
+    scanf("%d", &hello.server_delay);
+    //test
+    //printf("%d, %d, %d, %d\n", hello.type, hello.n_probes, hello.msg_size, hello.server_delay);
+	
+	// hello phase
+
+	// measurement phase
+	// ssize_t send(int sockfd, const void *buf, size_t len, int flags);
+	// msg is found in *buf
+	// this msg is <phase> <sp> <probe_seq_num> <sp> <payload>\n
+
+
 	close(sfd);
 	return 0;
 }

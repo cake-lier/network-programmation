@@ -9,6 +9,18 @@
 
 #define MAX_BUF_SIZE 1024
 
+typedef enum message_type{
+	RTT,
+	THPUT
+} message_type;
+
+typedef struct hello_msg{
+	message_type type;
+	int n_probes;
+	int msg_size;
+	int server_delay;
+} hello_msg;
+
 int main(int argc, char *argv[]){
 	struct sockaddr_in server_addr; // struct containing server address information
 	struct sockaddr_in client_addr; // struct containing client address information
@@ -20,6 +32,7 @@ int main(int argc, char *argv[]){
 	socklen_t cli_size;
 	char received_data [MAX_BUF_SIZE]; // Data to be received
 	char send_data [MAX_BUF_SIZE]; // Data to be sent
+	hello_msg hello; //Hello message data
 
 	sfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (sfd < 0) {
@@ -35,19 +48,26 @@ int main(int argc, char *argv[]){
 		exit(EXIT_FAILURE);
 	}
 	cli_size = sizeof(client_addr);
-	// Listen for incoming requests
+	// Mark sfd socket as receptive to connections
 	if (listen(sfd, SOMAXCONN) < 0){
 		perror("listen");
 		exit(EXIT_FAILURE);
 	}
 	while (true) {
 		// Wait for incoming requests
+		// newsfd is the socket to which client is connected
 		newsfd = accept(sfd, (struct sockaddr *) &client_addr, &cli_size);
 		if (newsfd < 0) {
 			perror("accept");
 			exit(EXIT_FAILURE);
 		}
 		//...
+
+		// hello phase
+
+		// measurement phase
+		
+
 	}
 	close(sfd);
 	return 0;
