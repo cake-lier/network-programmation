@@ -9,7 +9,7 @@
 \usepackage{enumitem}
 \renewcommand{\familydefault}{\sfdefault}
 
-\title{Assignment 1 - Programmazione di reti\newline Anno accademico 2018-2019}
+\title{Assignment 2 - Programmazione di reti\newline Anno accademico 2018-2019}
 \date{\today}
 
 \author{Matteo Castellucci - 0000825436\\Elena Rughi - 0000832797\\Yuqi Sun - 0000826197\newline}
@@ -17,248 +17,132 @@
 \begin{document}
 
 \maketitle
-
 \tableofcontents
 
 \chapter{Task Uno}
 
-Per lo svolgimento del \textit{task} qui di seguito abbiamo fatto riferimento il \textit{file} "task1.pcapng".
-
-\section{Fase Zero}
-
-Si sceglie l’interfaccia di connessione adoperata dal computer accedere a Internet, sulla quale si effettua la cattura di pacchetti.
+\newpage
 
 \begin{figure}[H]
 	\centering
-	\includegraphics[width=\linewidth]{images/image1_1.png}
-	\caption{Scelta dell'interfaccia su cui catturare i pacchetti}
-\end{figure}
- 
-\section{Fase Uno}
-
-Avviata la cattura, si imposta il filtro ``tcp.port == 21" per filtrare i pacchetti che vengono scambiati durante la connessione \textit{FTP} con il \textit{server ftp.ubuntu.com}, in quanto i 
-\textit{server FTP} sono in ascolto sulla \textit{well-known port} 21. Una volta stabilita la connessione, si conosce l’indirizzo \textit{IP} del \textit{server} e si può usare quest’ultimo per
-filtrare i prossimi pacchetti, indipendentemente dalle porte coinvolte, tramite il filtro ``ip.addr == $<$server-IP-address$>$". Dal terminale, l'utente, utilizzando il \textit{client}, esegue il
-comando ``ftp ftp.ubuntu.com" per iniziare la connessione; su Wireshark, si nota che il \textit{client}, da una propria porta impostata autonomamente, invia la richiesta di connessione alla porta
-21 del server specificato. Una volta stabilita la connessione - la cosiddetta \textit{command connection} - sulla porta 21, il \textit{server} richiede al \textit{client} di inserire \textit{username}
-e \textit{password}, dopo che l'utente li ha forniti, il \textit{login} è completato. Anche questo scambio di pacchetti avviene sulla porta 21 del \textit{server}.
-
-\begin{figure}[H]
-	\centering
-	\includegraphics[width=\linewidth]{images/image1_2.png}
-	\caption{Esecuzione della fase uno}
+	\includegraphics[width=\textwidth,height=\textheight,keepaspectratio]{images/diagram.png}
+	\caption{Diagramma di flusso seguito nel programma scritto}
 \end{figure}
 
-\section{Fase Due}
-
-La sequenza di comandi inviata dal client al server è stata la seguente:
-\begin{itemize}
-    \item ?: vengono visualizzati i comandi riconosciuti dal server ftp.ubuntu.com; in questo caso, non avviene alcuno scambio di pacchetti tra client e server.
-    \item ls: si visualizza il contenuto della cartella corrente, che è costituito solamente dalla cartella ``ubuntu". Il client effettua una request per stabilire una nuova connessione - detta 
-    \textit{data connection} -, per la quale sia client che server riservano nuove porte, diverse dalle precedenti. Una volta inviati i pacchetti che contengono i dati, il server decide di effettuare
-    la chiusura della connessione \textit{TCP}.
-
-    \begin{figure}[H]
-        \centering
-        \includegraphics[width=\linewidth]{images/image1_3.png}
-        \caption{Esecuzione del comando ``ls"}
-    \end{figure}
-
-    \item cd: con questo comando si entra nella \textit{directory} specificata dopo il nome del comando stesso, \textit{directory} individuata tramite il precedente comando ls; questo comando viene eseguito tramite
-    uno scambio di pacchetti che avviene esclusivamente sulla \textit{command connection} stabilita precedentemente. Nulla viene invece scambiato sulla \textit{data connection} per questo comando.
-    \item ls: analogamente a prima, il \textit{client} stabilisce una nuova \textit{data connection}, che viene chiusa al termine dell’invio dei dati richiesti.
-    
-    \begin{figure}[H]
-        \centering
-        \includegraphics[width=\linewidth]{images/image1_4.png}
-        \caption{Esecuzione del comando ``cd ubuntu" e del secondo comando ``ls"}
-    \end{figure}
-
-    \item get ls-lR.gz: il \textit{client} richiede al \textit{server} il \textit{file} ``ls-lR.gz"; viene stabilita una nuova \textit{data connection}, con nuove porte, poi il server inizia la trasmissione
-    del \textit{file} attraverso questa connessione, similmente a quanto accadeva con il comando ``ls". Terminata la trasmissione del \textit{file}, il \textit{server} chiude la \textit{data connection}.
-
-    \begin{figure}[H]
-        \centering
-        \includegraphics[width=\linewidth]{images/image1_5.png}
-        \caption{Esecuzione del comando ``get ls-lR.gz"}
-    \end{figure}
-
-    \item bye: il \textit{client} segnala al \textit{data connection} che desidera terminare la connessione sulla \textit{command connection}, l’unica correntemente aperta.
-    
-    \begin{figure}[H]
-        \centering
-        \includegraphics[width=\linewidth]{images/image1_6.png}
-        \caption{Esecuzione del comando ``bye"}
-    \end{figure}
-\end{itemize}
+Questo scherma rappresenta il flusso di controllo seguito dal programma, così come indicato nelle slide. Lo schema segue lo standard ISO 5807 per i diagrammi di flusso. Sono presenti
+sotto forma di operazioni tutte le \textit{system call} utilizzate, nonchè le macro per la gestione dei \textit{set} di \textit{file descriptor}. Per ciascuna delle prime è stato inserito
+un commento che ne espliciti il funzionamento.
 
 \chapter{Task Due}
 
-Per il \textit{task} due abbiamo fatto riferimento al file "task2.pcapng" per rispondere alle domande. Nell'analisi dei messaggi sono stati ignorati i pacchetti inerenti al \textit{three-way handshake}
-di \textit{TCP} nonchè i pacchetti di \textit{ACK} perchè considerati non significativi per l'analisi dello scambio di messaggi del protocollo \textit{FTP}. Infatti, questi pacchetti, essendo propri di \textit{TCP},
-sono presenti in qualsiasi scambio di messaggi tra protocolli applicativi basati su \textit{TCP} e non sono inerenti allo specifico protocollo \textit{FTP}.
+\section{Design del ``\textit{superserver}"}
 
-\section{Fase Zero}
+\begin{itemize}
+    \item Inizialmente viene definita la struttura dati sotto forma di ``\textit{struct}" per ospitare tutte le informazioni necessarie per gestire un generico servizio
+    \item Viene aperto il file ``inetd.txt" e viene letto riga per riga
+    \item Ogni riga del file ha lo stesso formato di quattro parole: ``$<$percorso servizio$>$ $<$protocollo$>$ $<$porta$>$ $<$modalità servizio$>$". Queste informazioni vengono tutte
+    memorizzate in una cella di un vettore di ``\textit{struct}" definite come sopra. Si tiene traccia del numero di servizi salvati
+    \item Viene inizializzato il \textit{set} dei ``\textit{socket file descriptor}" associati ai servizi salvati e viene creata una \textit{socket} per ogni servizio tramite le
+    funzioni necessarie: ``\textit{socket}", ``\textit{bind}", anche ``\textit{listen}" nel caso la socket fosse di associata al protocollo \textit{TCP}. La \textit{socket}
+    viene salvata assieme ai dati del servizio corrispondente nel vettore di ``\textit{struct}" nonchè viene inserita nel \textit{set} indicato precedentemente
+    \item Viene registrato l'\textit{handle} per il segnale di morte di un processo figlio, ``\textit{SIGCHLD}". In questo modo, ogni volta che un processo figlio muore,
+    se si occupava di gestire le richieste per un servizio in modalità ``\textit{wait}", si preoccupa di renderlo disponibile per i \textit{client} successivi che vogliono
+    accedervi reinserendolo nel \textit{set} dei ``\textit{socket file descriptor}"
+    \item La parte finale si basa su un ciclo che viene eseguito senza condizione di uscita, dove all'inzio si ha la funzione ``\textit{select}". Questa permette al
+    \textit{superserver} di rimanere in stato di \textit{wait} finchè almeno una socket è pronta per essere letta, ovvero un \textit{client} vuole comunicare con il
+    \textit{superserver}. Si trova in un ciclo perchè alla presenza di un segnale mandato al processo che esegue il programma, si interrompe l'attesa della funzione mentre
+    si vuole invece continuare ad attendere per i \textit{client}
+    \item Allo scattare della ``\textit{select}", per ogni ``\textit{socket}" pronta, si controlla se è necessario usare la funzione ``\textit{accept}" se essa è di tipo
+    \textit{TCP}. Dopodichè, si crea un processo figlio mediante la \textit{system call} ``\textit{fork}"
+    \item Il processo figlio è responsabile di chiudere ``\textit{stdin}", ``\textit{stdout}" e ``\textit{stderr}" e sostituirli, mediante la \textit{system call ``dup"},
+    con una \textit{socket}. Se il suo tipo è \textit{UDP}, la \textit{socket} scelta per la sostituzione è quella nel vettore di ``\textit{struct}", altrimenti se è di tipo \textit{TCP}
+    quella scelta è la \textit{socket} restituita dalla funzione ``\textit{accept}", mentre quella nel vettore viene chiusa. Infine, il processo figlio sostituisce il proprio
+    eseguibile binario con quello del servizio richiesto mediante la funzione ``\textit{execle}"
+    \item Nel frattempo, il processo padre, qualora la socket pronta fosse di tipo \textit{TCP}, chiude la \textit{socket} per la comunicazione creata dalla funzione ``\textit{accept}".
+    In seguito, in caso il servizio richiesto fosse avesse modalità ``\textit{wait}", rimuove dal \textit{set} dei ``\textit{socket file descriptor}" la socket appena entrata in
+    uso. In questo modo, nessuno potrà più richiedere quel servizio fino a che l'utilizzo da parte del \textit{client} corrente non sarà terminato. 
+\end{itemize}
 
-\begin{enumerate}
-    \item[\textbf{1.}] Il filtro migliore per visualizzare il traffico \textit{FTP} è ``tcp.port == 21". Questo perchè permette di visualizzare
-    solamente i dati che vengono scambiati attraverso la porta 21 del server, che sappiamo essere la \textit{well-known port}
-    associata al protocollo \textit{FTP}. Per poter visualizzare tutto il traffico che viene scambiato tra client e server durante
-    la sessione però questo filtro non basta, ma occorre sfruttare l'indirizzo \textit{IP} del server nel filtro ``ip.addr == $<$server-IP-address$>$",
-    filtro che però può essere applicato solamente nelle fasi successive non sapendo noi a priori verso quale server - e perciò verso quale \textit{IP} -
-    stabiliremo una connessione. Quindi, in summa, il primo filtro indicato risulta essere il migliore.
-\end{enumerate}
+\section{Compilazione del ``\textit{superserver}"}
 
-\section{Fase Uno}
+È stato utilizzato il ``\textit{Makefile}" incluso assieme agli altri file di questo assignment, che in pratica non fa altro che lanciare il comando ``gcc superserver.c
+-o superserver".
 
-\begin{enumerate}
-    \item[\textbf{1.}] L'indirizzo \textit{IP} del \textit{server FTP} è 91.189.88.31.
-    \item[\textbf{2.}] La porta usata dal \textit{client} per iniziare la connessione \textit{FTP} è la 53494.
-    \item[\textbf{3.}] I messaggi \textit{FTP} individuati in questa fase sono: \newpage
-        \begin{tabularx}{\linewidth}{>{\hsize=0.25\hsize}X|X|>{\hsize=0.6\hsize}X|>{\hsize=0.475\hsize}X|>{\hsize=0.35\hsize}X|>{\hsize=0.375\hsize}X}
-            \hline
-            \textbf{N.} & \textbf{Messaggio} & \textbf{Tipo\newline messaggio} & \textbf{Tipo connessione} & \textbf{Porta\newline Client} & \textbf{Porta\newline Server}\\
-            \hline
-            \hline
-            954 & 220 FTP server (vsftpd) & Response (Server $\rightarrow$ Client) & Comandi & 53494 & 21\\
-            \hline
-            955 & OPTS UTF8 ON & Request (Client $\rightarrow$ Server) & Comandi & 21 & 53494\\
-            \hline
-            961 & 200 Always in UTF8 mode. & Response (Server $\rightarrow$ Client) & Comandi & 53494 & 21\\
-            \hline
-            1513 & USER anonymous & Request (Client $\rightarrow$ Server) & Comandi & 21 & 53494\\
-            \hline
-            1518 & 331 Please specify the password. & Response (Server $\rightarrow$ Client) & Comandi & 53494 & 21\\
-            \hline
-            1671 & PASS & Request (Client $\rightarrow$ Server) & Comandi & 21 & 53494\\
-            \hline
-            1676 & 230 Login successful. & Response (Server $\rightarrow$ Client) & Comandi & 53494 & 21\\
-            \hline
-            \hline
-            \caption{Messaggi scambiati durante la fase uno}
-        \end{tabularx} 
-    \item[\textbf{4.}] No, non sono presenti messaggi scambiati nella connessione dati in questa fase. Infatti, non sono state aperte altre connessioni
-    oltre a quella correntemente in uso per i comandi, segno che non sono ancora stati scambiati dati tra \textit{client} e \textit{server}.
-\end{enumerate}
+\section{Descrizione dei test effettuati per controllare il comportamento del ``\textit{superserver}"}
+
+Inizialmente sono stati compilati tutti i file sorgente, sia del ``\textit{superserver}" sia quelli che ci sono stati forniti per ragioni di test.
 
 \begin{figure}[H]
 	\centering
-	\includegraphics[width=\linewidth]{images/image2_1.png}
-	\caption{Messaggi scambiati tra client e server nella fase uno}
+	\includegraphics[width=\linewidth]{images/gcc.JPG}
+	\caption{Compilazione dei sorgenti necessari ai test}
 \end{figure}
 
-\section{Fase Due}
+Sono stati posti nella stessa cartella dell'eseguibile del ``\textit{superserver}" i file eseguibili ottenuti da ``tcpServer.c" e da ``udpServer.c", nonchè il file di
+configurazione. Nel file di configurazione sono stati specificati quattro servizi, due con protocollo \textit{TCP} e due con protocollo \textit{UDP}, ciascuno dei quali
+ha come modalità specificata ``wait" oppure ``nowait" così da poter testare entrambi i protocolli in entrambe le modalità. È stato poi eseguito da terminale l'eseguibile
+del ``\textit{superserver}". Per ciascuno dei quattro test, uno per servizio, sono stati eseguiti due processi \textit{client} come richiesto. Nel frattempo, in ciascuno
+dei test, è stato tenuto aperto un terminale dove veniva eseguito il comando \textit{BASH} ``ps -aux" per visualizzare i processi correntemente in esecuzione ed osservare
+quindi il numero di processi attivi dei \textit{server} avviati dal ``\textit{superserver}" stesso.
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\linewidth]{images/launch_superserver.JPG}
+	\caption{Esecuzione dell'eseguibile del ``\textit{superserver}" nonchè del comando ``ps -aux"}
+\end{figure}
+
+Per ogni \textit{client}, l'indirizzo \textit{IP} passato come argomento all'esecuzione dello stesso è 
+stato l'indirizzo di ``\textit{loopback}" 127.0.0.1, ricavato tramite il comando ``ifconfig". Il numero di porta passato come argomento all'esecuzione del processo client
+invece è stato scelto di volta in volta diverso tra i vari test, in modo da corrispondere alle indicazioni del file di configurazione ``inetd.txt".
+
+\section{Comportamento del ``\textit{superserver}"}
 
 \begin{enumerate}
-    \item[\textbf{1. 2.}] I messaggi \textit{FTP} individuati in questa fase sono:
-        \begin{tabularx}{\linewidth}{>{\hsize=0.375\hsize}X|X|>{\hsize=0.35\hsize}X|>{\hsize=0.35\hsize}X}
-            \hline
-            \textbf{N.} & \textbf{Messaggio} & \textbf{Tipo messaggio} & \textbf{Tipo connessione} \\
-            \hline
-            \hline
-            6738 & PORT 192,168,1,10,209,2 & Request & Comandi\\
-            \hline
-            6741 & 200 PORT command successful. Consider using PASV. & Response & Comandi\\
-            \hline
-            6744 & NLST & Request & Comandi\\
-            \hline
-            6747-6754, 6756, 6761 & \textit{Trasferimento dati inerente alla richiesta di directory listing} & & Dati\\
-            \hline
-            6755 & 150 Here comes the directory listing. & Response & Comandi\\
-            \hline
-            6759 & 226 Directory send OK. & Response & Comandi\\
-            \hline
-            7625 & CWD ubuntu & Request & Comandi\\
-            \hline
-            7631 & 250 Directory successfully changed. & Response & Comandi\\
-            \hline
-            7878 & PORT 192,168,1,10,209,3 & Request & Comandi\\
-            \hline
-            7884 & 200 PORT command successful. Consider using PASV. & Response & Comandi\\
-            \hline
-            7885 & NLST & Request & Comandi\\
-            \hline
-            7890-7901, 7903, 7912 & \textit{Trasferimento dati inerente alla richiesta di directory listing} & & Dati\\
-            \hline
-            7902 & 150 Here comes the directory listing & Response & Comandi\\
-            \hline
-            7910 & 226 Directory send OK & Response & Comandi\\
-            \hline
-            8845 & PORT 192,168,1,10,209,4 & Request & Comandi\\
-            \hline
-            8849 & 200 PORT command successful. Consider using PASV & Response & Comandi\\
-            \hline
-            8850 & RETR ls-lR.gz & Request & Comandi\\
-            \hline
-            8863 & 150 Opening BINARY mode data connection for ls-lR.gz (18250228 bytes) & Response & Comandi\\
-            \hline
-            8854, 8855, 8864-8880, 8884-26804, 26809 & \textit{Trasferimento dati inerente al file ls-lR.gz} & & Dati\\
-            \hline
-            26808 & 226 Transfer complete (trasferimento dati completo) & Response & Comandi\\
-            \hline
-            27596 & QUIT (richiesta di terminazione sessione) & Request & Comandi\\	    
-            \hline
-            \hline
-            \caption{Messaggi scambiati durante la fase due}
-        \end{tabularx}
-    \item [\textbf{3.}] a) La \textit{data connection} è aperta in modalità \textit{active} perchè è il \textit{client} per primo a segnalare al \textit{server} tramite il comando ``PORT" a quale 
-    \textit{socket} effettuare la connessione per lo scambio dei dati. È poi il \textit{server} in un secondo momento a decidere di aprire la connessione sulla base delle informazioni ricevute dal
-    \textit{client}, comportamento di una \textit{data connection} aperta in modalità \textit{active}.
-    \item [\textbf{3.}] b)
-        \begin{tabularx}{\linewidth}{>{\hsize=0.5\hsize}X|X|>{\hsize=0.35\hsize}X|>{\hsize=0.275\hsize}X|>{\hsize=0.275\hsize}X}
-            \hline
-            \textbf{N.} & \textbf{Messaggio} & \textbf{Tipo connessione dati} & \textbf{Porta client} & \textbf{Porta server}\\
-            \hline
-            \hline
-            6747-6754, 6756, 6761 & \textit{Trasferimento dati inerente alla richiesta di directory listing} & active & 53506 & 40423\\
-            \hline
-            7890-7901, 7903, 7912 & \textit{Trasferimento dati inerente alla richiesta di directory listing} & active & 53507 & 39611\\
-            \hline
-            8854, 8855, 8864-8880, 8884-26804, 26809 & \textit{Trasferimento dati inerente al file ls-lR.gz} & active & 53508 & 42077\\
-            \hline
-            \hline
-            \caption{Messaggi scambiati durante la fase due}
-        \end{tabularx}
-    \item [\textbf{4.}]
-        \begin{itemize}
-            \item PORT 192,168,1,10,209,2: con il comando PORT il client dice al server su quale indirizzo \textit{IP} e quale porta sarà in ascolto per aprire la
-            connessione dati
-            \item PORT command successful. Consider using PASV: il server comunica al client di aver ricevuto correttamente e compreso il comando ``PORT".
-	        Suggerisce di usare il comando ``PASV" per iniziare una connessione dati di tipo ``\textit{passive}"
-            \item NLST: con NLST si richiede la lista dei \textit{filename} nella directory specificata (in questo caso quella corrente)
-            \item \textit{Trasferimento dati inerente alla richiesta di directory listing}: messaggi per il trasferimento dei dati inerenti al \textit{directory listing}
-            chiesto in precedenza
-	        \item 150 Here comes the directory listing.: messaggio da parte del server al client che indica l'inizio del trasferimento dei dati inerenti al \textit{directory listing}
-	        \item 226 Directory send OK.: messaggio da parte del server al client che indica l'avvenuto trasferimento con successo dei dati inerenti al \textit{directory listing}    
-            \item CWD ubuntu: messaggio del client per cambiare la directory corrente nella sottodirectory ``ubuntu"
-            \item 250 Directory successfully changed.: messaggio del server che indica il cambiamento della directory effettuato con successo
-            \item PORT 192,168,1,10,209,3: ha significato analogo a quello del comando ``PORT" precedente, ma il client si mette in ascolto su una nuova porta, diversa
-            dalla precedente
-            \item PORT command successful. Consider using PASV: messaggio con significato analogo al precedente dello stesso tipo
-            \item NLST: messaggio con significato analogo al precedente dello stesso tipo
-            \item \textit{Trasferimento dati inerente alla richiesta di directory listing}: gruppo di messaggi con significato analogo ai precedenti dello stesso tipo
-	        \item 150 Here comes the directory listing.: messaggio con significato analogo al precedente dello stesso tipo
-	        \item 226 Directory send OK.: messaggio con significato analogo al precedente dello stesso tipo
-            \item RETR ls-lR.gz: messaggio del client per ottenere una copia del file ``ls-lR.gz"
-            \item 150 Opening BINARY mode data connection for ls-lR.gz (18250228 bytes): messaggio del server che specifica l'apertura di una \textit{data connection}
-            in modalità ``BINARY" per il trasferimento del file richiesto, ``ls-lR.gz", che ha dimensioni pari a 18250228 bytes
-            \item \textit{Trasferimento dati inerente al file ls-lR.gz}: gruppo di messaggi inviati sulla \textit{data connection} appena aperta che effettuano il
-            trasferimento del file dal server al client
-            \item 226 Transfer complete (trasferimento dati completo): messaggio del server che indica il completamento del trasferimento del file richiesto
-            \item QUIT (richiesta di terminazione sessione): messaggio del client per richiedere la chiusura della \textit{command connection} correntemente aperta
-        \end{itemize}
+	\item Qual è il comportamento di ``udpServer"?
+	\begin{itemize}
+		\item Wait mode: è in esecuzione un solo ``udpServer", ma che è in grado di comunicare con entrambi i client contemporaneamente. Questo perchè il protocollo UDP è
+		\textit{connectionless} e ogni pacchetto che arriva fa vita a sè stante, cioè la \textit{socket UDP} non è identificata da informazioni come chi può mandare certi
+		pacchetti a quella  \textit{socket}. Il fatto che sia presente una sola istanza del processo \textit{server UDP} è perchè il server attende il completamento
+		dell'operazione corrente prima di iniziarne una nuova tramite un nuovo processo, portandolo ad adempire le richieste di molteplici client in modo sequenziale tramite
+		un unico processo.
+		\begin{figure}[H]
+			\centering
+			\includegraphics[width=\linewidth]{images/launch_udpClientWait.JPG}
+			\caption{Test del \textit{server UDP} in modalità ``wait"}
+		\end{figure}
+		\item Nowait mode: in questo caso, l'unica differenza riscontrata è che se più di un client si connette al server, il server crea molteplici processi al fine di
+		soddisfare le richieste di ogni client concorrentemente, così come indicato dal tipo di modalità, cioè ``nowait".
+		\begin{figure}[H]
+			\centering
+			\includegraphics[width=\linewidth]{images/launch_udpClientNowait.JPG}
+			\caption{Test del \textit{server UDP} in modalità ``nowait"}
+		\end{figure}
+	\end{itemize}
+	\item Qual è il comportamento di ``tcpServer"?
+	\begin{itemize}
+		\item Wait mode: quando più client tentano di connettersi al server, esso interagisce con un solo client alla volta; a differenza di \textit{UDP},
+		poichè è \textit{connection-oriented}, il protocollo \textit{TCP} necessita dell'instaurazione di una connessione con un \textit{client} per potervi comunicare.
+		Il \textit{server TCP} perciò non può interagire con altri client finchè ha una connessione attiva perchè attraverso essa riceve esclusivamente i pacchetti da uno
+		specifico \textit{client} e nessun altro, al contrario di come avevamo visto per il \textit{server UDP}. Anche in questo caso, il \textit{server TCP} crea un solo
+		processo e dopo la terminazione del primo processo \textit{client}, il \textit{server} si connette al secondo ed esegue le richieste di quest'ultimo e così via.
+		\begin{figure}[H]
+			\centering
+			\includegraphics[width=\linewidth]{images/launch_tcpClientWait.JPG}
+			\caption{Test del \textit{server TCP} in modalità ``wait" all'inizio}
+		\end{figure}
+		\begin{figure}[H]
+			\centering
+			\includegraphics[width=\linewidth]{images/launch_tcpClientWait_2.JPG}
+			\caption{Test del \textit{server TCP} in modalità ``wait" dopo la chiusura della connessione con il primo \textit{client}}
+		\end{figure}
+		\item Nowait mode: quando il \textit{server TCP} riceve molteplici richieste di connessione da parte di diversi client crea un processo per ogni client, così da
+		poter interagire con essi contemporaneamente, in osservanza alla modalità concorrente scelta.
+		\begin{figure}[H]
+			\centering
+			\includegraphics[width=\linewidth]{images/launch_tcpClientNowait.JPG}
+			\caption{Test del \textit{server TCP} in modalità ``nowait"}
+		\end{figure}
+	\end{itemize}
 \end{enumerate}
-
-\begin{figure}[H]
-	\centering
-	\includegraphics[width=\linewidth]{images/image2_2.png}
-	\caption{Messaggi scambiati tra client e server durante la fase due}
-\end{figure}
-
-\begin{figure}[H]
-	\centering
-	\includegraphics[width=\linewidth]{images/image2_3.png}
-	\caption{Messaggi scambiati tra client e server durante la fase due}
-\end{figure}
 
 \end{document}
