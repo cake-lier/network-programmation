@@ -8,6 +8,9 @@
 #include <stdbool.h>
 
 #define MAX_BUF_SIZE 1024
+#define BYE_MSG "b\n"
+#define OK_BYE_PHASE "200 OK - Closing"
+#define ERROR_BYE_PHASE "404 ERROR - Invalid Bye message"
 
 typedef enum message_type{
 	RTT,
@@ -21,7 +24,7 @@ typedef struct hello_msg{
 	int server_delay;
 } hello_msg;
 
-int main(int argc, char *argv[]){
+int main(int argc, char *argv[]) {
 	struct sockaddr_in server_addr; // struct containing server address information
 	struct sockaddr_in client_addr; // struct containing client address information
 	int sfd; // Server socket filed descriptor
@@ -49,7 +52,7 @@ int main(int argc, char *argv[]){
 	}
 	cli_size = sizeof(client_addr);
 	// Mark sfd socket as receptive to connections
-	if (listen(sfd, SOMAXCONN) < 0){
+	if (listen(sfd, SOMAXCONN) < 0) {
 		perror("listen");
 		exit(EXIT_FAILURE);
 	}
@@ -61,13 +64,24 @@ int main(int argc, char *argv[]){
 			perror("accept");
 			exit(EXIT_FAILURE);
 		}
-		//...
-
 		// hello phase
 
 		// measurement phase
 		
-
+		//receive bye message
+		memset(received_data, '\0', MAX_BUF_SIZE);
+		byte_recv = recv(newsfd, received_data, MAX_BUF_SIZE, 0);
+		printf("Client msg: %s\n", received_data);
+		//if the message is correct, send ok response, error otherwise
+		if (byte_recv == 2 && strncmp(received_data, BYE_MSG, 2) == 0) {
+			msg_send = OK_BYE_PHASE;
+		} else {
+			msg_send = ERROR_BYE_PHASE;
+		}
+		send(newsfd, msg_send, strlen(msg_send), 0);
+		printf("Server msg: %s\n", msg_send);
+		//terminate connection
+		close(newsfd);
 	}
 	close(sfd);
 	return 0;
