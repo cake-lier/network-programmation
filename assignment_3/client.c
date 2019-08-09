@@ -7,6 +7,8 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <stdbool.h>
+#include <math.h>
 
 #define MAX_BUF_SIZE 1024
 #define BYE_MSG "b\n"
@@ -23,6 +25,9 @@ typedef struct hello_msg {
 	int server_delay;
 } hello_msg;
 
+// Merges the two given strings, in order, separated by a space
+char *make_msg(char *first, char *second);
+
 int main(int argc, char *argv[]) {
 	struct sockaddr_in server_addr; // struct containing server address information
 	struct sockaddr_in client_addr; // struct containing client address information
@@ -34,8 +39,7 @@ int main(int argc, char *argv[]) {
 	socklen_t serv_size;
 	char received_data[MAX_BUF_SIZE]; // Data to be received
 	char send_data[MAX_BUF_SIZE]; // Data to be sent
-
-	hello_msg hello;
+	hello_msg hello; // Hello message data
 
 	sfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (sfd < 0) {
@@ -47,41 +51,100 @@ int main(int argc, char *argv[]) {
 	server_addr.sin_addr.s_addr = inet_addr(argv[1]);
 	
     while (true) {
-        // stdin
-        printf("Specify whether you want to measure RTT [0] or THROUGHPUT [1]\n");
-        scanf("%d", &hello.type);
-
+        // Get required parameters from stdin
+        while(true){
+            printf("Specify whether you want to measure RTT [0] or THROUGHPUT [1]\n");
+            scanf("%d", (int *)&hello.type);
+            if(hello.type < 0 || hello.type > 1){
+                printf("Please insert either 0 (RTT) or 1 (THROUGHPUT)");
+            } else {
+                break;
+            }
+        }
         printf("Specify desired number of probes\n");
         scanf("%d", &hello.n_probes);
-
         printf("Specify the number of bytes contained in the probe's payload\n");
         scanf("%d", &hello.msg_size);
-
         printf("Specify desired server delay\n");
         scanf("%d", &hello.server_delay);
 
         if (connect(sfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
             perror("connect"); // Print error message
             exit(EXIT_FAILURE);
-        }     
-        //test
-        //printf("%d, %d, %d, %d\n", hello.type, hello.n_probes, hello.msg_size, hello.server_delay);
+        }
         
-        // hello phase
+        //----------------------------------------
+        //------------- Hello phase --------------
+        //----------------------------------------
 
-        // measurement phase
-        // ssize_t send(int sockfd, const void *buf, size_t len, int flags);
-        // msg is found in *buf
-        // this msg is <phase> <sp> <probe_seq_num> <sp> <payload>\n
+        //...
 
-        //send bye message to server
-        send(sfd, BYE_MSG, strlen(BYE_MSG), 0);
-        printf("Client msg: %s\n", BYE_MSG);
-        //read response from server
-        memset(received_data, '\0', MAX_BUF_SIZE);
-        recv(sfd, received_data, MAX_BUF_SIZE, 0);
-        printf("Server msg: %s\n", received_data);
-        close(sfd);
+        //----------------------------------------
+        //---------- Measurement phase -----------
+        //----------------------------------------
+
+        // Fill payload string so it's size == hello.msg_size
+        int length = ceil(hello.msg_size/sizeof(char));
+        char payload[length];
+        for(int i = 0; i<length-1; i++){
+            payload[i] = 'a';
+        }
+        payload[length-1] = '\0';
+        
+        // Send probe messages
+        int seq_num = 1; // probe sequence number
+        while(true){
+            // Creation of complete probe message
+            // <phase> <sp> <probe_seq_num> <sp> <payload> <\n>
+            char *str_seq_num = malloc(sizeof(int)*5);
+            sprintf(str_seq_num, "%d", seq_num);
+            char *probe_msg;
+            probe_msg = make_msg("m", str_seq_num);
+            probe_msg = make_msg(probe_msg, payload);
+            probe_msg = make_msg(probe_msg, "\n");
+
+            // Send probe message to server
+            if (send(sfd, probe_msg, strlen(probe_msg), 0) == -1){
+                perror("Failed to send probe message");
+                exit(EXIT_FAILURE);
+            }
+
+            // Read response from server
+            memset(received_data, '\0', MAX_BUF_SIZE);
+            recv(sfd, received_data, MAX_BUF_SIZE, 0);
+            // If messages aren't the same, close socket and go back to waiting user input
+            if (strcmp(received_data, probe_msg) != 0) {
+                free(probe_msg);
+                close(sfd);
+                break;
+            }
+            free(probe_msg);
+            seq_num++;
+            if (seq_num > hello.n_probes){
+                //----------------------------------------
+                //-------------- Bye phase ---------------
+                //----------------------------------------
+
+                // Send bye message to server
+                send(sfd, BYE_MSG, strlen(BYE_MSG), 0);
+                printf("Client msg: %s\n", BYE_MSG);
+                // Read response from server
+                memset(received_data, '\0', MAX_BUF_SIZE);
+                recv(sfd, received_data, MAX_BUF_SIZE, 0);
+                printf("Server msg: %s\n", received_data);
+                close(sfd); 
+            }
+        }
     }
 	return 0;
+}
+
+char *make_msg(char *first, char *second){
+    char *space = " ";
+    char *third = malloc(strlen(first)+strlen(second)+sizeof(char));
+    third[0]='\0';
+    strcat(third, first);
+    strcat(third, space);
+    strcat(third, second);
+	return third;
 }
