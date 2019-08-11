@@ -20,9 +20,9 @@ typedef enum message_type {
 
 typedef struct hello_msg {
 	message_type type;
-	int n_probes;
-	int msg_size;
-	int server_delay;
+	unsigned int n_probes;
+	unsigned int msg_size;
+	unsigned int server_delay;
 } hello_msg;
 
 // Merges the two given strings, in order, separated by a space
@@ -39,13 +39,13 @@ int main(int argc, char *argv[]) {
 	hello_msg hello; // Hello message data
     double sum_rtt = 0;
 
-	sfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if (sfd < 0) {
-		perror("socket"); // Print error message
-		exit(EXIT_FAILURE);
-	}
+    if (argc != 3) {
+    		printf("Wrong parameters number\n");
+    		printf("%s <server IP (dotted notation)> <server port>\n", argv[0]);
+    		exit(EXIT_FAILURE);
+    }
 	server_addr.sin_family = AF_INET;
-	server_addr.sin_port = htons(atoi(argv[2]));
+	server_addr.sin_port = htons((short unsigned int)atoi(argv[2]));
 	server_addr.sin_addr.s_addr = inet_addr(argv[1]);
 	
     while (true) {
@@ -55,16 +55,20 @@ int main(int argc, char *argv[]) {
             scanf("%d", (int *)&hello.type);
         } while (hello.type < 0 || hello.type > 1);
         printf("Specify desired number of probes\n");
-        scanf("%d", &hello.n_probes);
+        scanf("%u", &hello.n_probes);
         printf("Specify the number of bytes contained in the probe's payload\n");
-        scanf("%d", &hello.msg_size);
+        scanf("%u", &hello.msg_size);
         printf("Specify desired server delay\n");
-        scanf("%d", &hello.server_delay);
+        scanf("%u", &hello.server_delay);
+        sfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    		if (sfd < 0) {
+    			perror("socket"); // Print error message
+    			exit(EXIT_FAILURE);
+    		}
         if (connect(sfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
             perror("Error in \"connect\" function"); // Print error message
             exit(EXIT_FAILURE);
         }
-        
         //----------------------------------------
         //------------- Hello phase --------------
         //----------------------------------------
@@ -74,21 +78,20 @@ int main(int argc, char *argv[]) {
         //----------------------------------------
         //---------- Measurement phase -----------
         //----------------------------------------
-
         // Fill payload string so it's size == hello.msg_size
-        char *payload = malloc(hello.msg_size * sizeof(char));
+        char *payload = malloc((hello.msg_size + 1) * sizeof(char));
         if (payload == NULL) {
         		printf("Not enough memory\n");
         		exit(EXIT_FAILURE);
         }
-        for (int i = 0; i < hello.msg_size; i++) {
+        for (unsigned int i = 0; i < hello.msg_size; i++) {
             payload[i] = 'F';
         }
-        payload[hello.msg_size - 1] = '\0';
+        payload[hello.msg_size] = '\0';
         
         // Send probe messages
         bool error = false;
-        for (int seq_num = 1; seq_num <= hello.n_probes; seq_num++) {
+        for (unsigned int seq_num = 1; seq_num <= hello.n_probes; seq_num++) {
             // Creation of complete probe message
             // <phase> <sp> <probe_seq_num> <sp> <payload> <\n>
             char *str_seq_num = calloc(12, sizeof(char));
@@ -103,7 +106,14 @@ int main(int argc, char *argv[]) {
             probe_msg = strcat_space("m", str_seq_num);
             free(str_seq_num);
             probe_msg = strcat_space(probe_msg, payload);
-            probe_msg = strcat_space(probe_msg, "\n");
+            size_t orig_probe_size = strlen(probe_msg);
+            probe_msg = realloc(probe_msg, orig_probe_size + 2);
+            if (probe_msg == NULL) {
+            		printf("Not enough memory\n");
+            		exit(EXIT_FAILURE);
+            }
+            probe_msg[orig_probe_size] = '\n';
+            probe_msg[orig_probe_size + 1] = '\0';
             // Send probe message to server
             printf("Client msg: %s\n", probe_msg);
             memset(received_data, '\0', MAX_BUF_SIZE);
@@ -117,13 +127,13 @@ int main(int argc, char *argv[]) {
             }
             // Read response from server
             byte_recv = recv(sfd, received_data, MAX_BUF_SIZE, 0);
-           	clock_gettime(CLOCK_MONOTONIC, &time_start);
+           	clock_gettime(CLOCK_MONOTONIC, &time_end);
 
            	double rtt = timespec_diff(&time_start, &time_end);
            	printf("Probe n.%d took %g ms\n", seq_num, rtt);
            	sum_rtt += rtt;
 
-            printf("Client msg: %s\n", received_data);
+            printf("Server msg: %s\n", received_data);
             //If messages aren't the same, close socket and go back to waiting user input
             if (strncmp(received_data, probe_msg, strlen(received_data)) != 0) {
             		error = true;
@@ -140,14 +150,14 @@ int main(int argc, char *argv[]) {
         		printf("Average RTT calculated %g ms\n", avg_rtt);
 
         		FILE *fp = fopen("rtt_test.txt", "a");
-        		fprintf(fp, "%d,%d,%g", hello.msg_size, hello.server_delay, avg_rtt);
+        		fprintf(fp, "%d,%d,%g\n", hello.msg_size, hello.server_delay, avg_rtt);
         		fclose(fp);
         } else if (hello.type == THPUT) {
-        		double avg_thruput = (byte_recv * 8) / avg_rtt;
+        		double avg_thruput = ((double)byte_recv * 8) / avg_rtt;
         		printf("Average throughput calculated %g kbps\n", avg_thruput);
 
-        		FILE *fp = fopen("thruput_test.txt", "a");
-        		fprintf(fp, "%g,%d,%g", (double)byte_recv * 8 / 1000, hello.server_delay, avg_thruput);
+        		FILE *fp = fopen("thput_test.txt", "a");
+        		fprintf(fp, "%g,%d,%g\n", (double)byte_recv * 8 / 1000, hello.server_delay, avg_thruput);
         		fclose(fp);
         }
         if (!error) {
@@ -187,5 +197,5 @@ double timespec_diff(struct timespec *time_start, struct timespec *time_end) {
         result.tv_sec = time_end->tv_sec - time_start->tv_sec;
         result.tv_nsec = time_end->tv_nsec - time_start->tv_nsec;
     }
-    return difftime(result.tv_sec, 0) * 1000 + (result.tv_nsec / 1000000.0);
+    return difftime(result.tv_sec, 0) * 1000 + ((double)result.tv_nsec / 1000000.0);
 }
