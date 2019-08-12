@@ -11,6 +11,8 @@
 
 #define MAX_BUF_SIZE 1024
 #define BYE_MSG "b\n"
+#define OK_HELLO_PHASE  "200 OK - Ready"
+#define ERROR_HELLO_PHASE "404 ERROR – Invalid Hello message"
 #define OK_BYE_PHASE "200 OK - Closing"
 #define ERROR_BYE_PHASE "404 ERROR - Invalid Bye message"
 #define ERROR_MEASUREMENT_PHASE "404 ERROR - Invalid Measurement message"
@@ -37,6 +39,7 @@ int main(int argc, char *argv[]) {
 	ssize_t byte_recv; // Number of bytes received
 	socklen_t cli_size = sizeof(client_addr);
 	char received_data[MAX_BUF_SIZE]; // Data to be received
+	char *response;
 	hello_msg hello; //Hello message data
 
 	if (argc != 2) {
@@ -63,36 +66,83 @@ int main(int argc, char *argv[]) {
 		exit(EXIT_FAILURE);
 	}
 	while (true) {
-		// Wait for incoming requests
-		// newsfd is the socket to which client is connected
-		newsfd = accept(sfd, (struct sockaddr *)&client_addr, &cli_size);
-		if (newsfd < 0) {
-			perror("Error on \"accept\" function");
-			exit(EXIT_FAILURE);
-		}
-		char *dotted_addr = malloc(sizeof(char) * (INET_ADDRSTRLEN + 1));
-		if (dotted_addr == NULL) {
-			printf("Not enough memory\n");
-			exit(EXIT_FAILURE);
-		}
-		dotted_addr[INET_ADDRSTRLEN] = '\0';
-		if (inet_ntop(AF_INET, &client_addr.sin_addr, dotted_addr, INET_ADDRSTRLEN) == NULL) {
-			perror("Error in \"inet_ntop\" function");
-			exit(EXIT_FAILURE);
-		}
-		printf("Client connected with address %s and port %d\n", dotted_addr, ntohs(client_addr.sin_port));
-		free(dotted_addr);
+		bool error = false;
+
+		do {
+			// Wait for incoming requests
+			// newsfd is the socket to which client is connected
+			newsfd = accept(sfd, (struct sockaddr *)&client_addr, &cli_size);
+			if (newsfd < 0) {
+				perror("Error on \"accept\" function");
+				exit(EXIT_FAILURE);
+			}
+			char *dotted_addr = malloc(sizeof(char) * (INET_ADDRSTRLEN + 1));
+			if (dotted_addr == NULL) {
+				printf("Not enough memory\n");
+				exit(EXIT_FAILURE);
+			}
+			dotted_addr[INET_ADDRSTRLEN] = '\0';
+			if (inet_ntop(AF_INET, &client_addr.sin_addr, dotted_addr, INET_ADDRSTRLEN) == NULL) {
+				perror("Error in \"inet_ntop\" function");
+				exit(EXIT_FAILURE);
+			}
+			printf("Client connected with address %s and port %d\n", dotted_addr, ntohs(client_addr.sin_port));
+			free(dotted_addr);
+			//----------------------------------------
+	        //------------- Hello phase --------------
+	        //----------------------------------------
+			if (recv(newsfd, received_data, MAX_BUF_SIZE, 0) < 0) {
+				perror("Error in \"recv\" function during Hello phase\n");
+				exit(EXIT_FAILURE);
+			}
+			//check if the hello message starts with "h" and ends with "\n"
+
+			size_t received_length = strlen(received_data);
+			if (received_data[received_length - 1] != '\n' || received_data[0] != 'h') {
+				error = true;
+			}
+			if (!error) {
+				//save received_data values
+				char *tmp = strtok(received_data, " ");
+				int numFields = 0;
+				int values[4];
+
+				while ((tmp = strtok(NULL, " ")) != NULL && numFields < 4) {
+					values[numFields] = atoi(tmp);
+					numFields++;
+				}
+				/*if numFields is different than 4 then there are fewer or more fields than allowed
+				otherwise check if the received values are correct*/
+				if (numFields != 4 || !(values[0] == 0 || values[0] == 1)
+				|| values[1] < 20 || values[2] < 0 || values[3] < 0) {
+					error = true;
+				}
+				//initialise hello
+				hello.type = values[0];
+				hello.n_probes = (unsigned int)values[1];
+				hello.msg_size = (unsigned int)values[2];
+				hello.server_delay = (unsigned int)values[3];
+			}
+			if (error) {
+				response = ERROR_HELLO_PHASE;
+			} else {
+				response = OK_HELLO_PHASE;
+			}
+			if (send(newsfd, response, strlen(response), 0) < 0) {
+				perror("Error in \"send\" function during Hello phase\n");
+				exit(EXIT_FAILURE);
+			}
+			printf("Server msg: %s\n", response);
+			if (error) {
+				if (close(newsfd) < 0){
+					perror("Error in \"close\" function during Hello phase\n");
+					exit(EXIT_FAILURE);
+				}
+			}
+		} while (error);
 		//----------------------------------------
-        //------------- Hello phase --------------
-        //----------------------------------------
-
-        //...
-
-        //----------------------------------------
         //---------- Measurement phase -----------
         //----------------------------------------
-		char *msg_send;
-		bool error = false;
 		for (unsigned int current_probes = 1; current_probes <= hello.n_probes; current_probes++) {
 			// Receive probe messages from client
 			memset(received_data, '\0', MAX_BUF_SIZE);
@@ -105,18 +155,18 @@ int main(int argc, char *argv[]) {
 			// Check if probe message is valid
 			char *cur_probes_str = parse_to_string(current_probes);
 			size_t cur_probes_str_len = strlen(cur_probes_str);
-			msg_send = received_data; // default echo
+			response = received_data; // default echo
 			if (strncmp(received_data, "m ", 2) != 0
 				|| strncmp(received_data + 2, cur_probes_str, cur_probes_str_len) != 0
 				|| received_data[cur_probes_str_len + 2] != ' '
 				|| strlen(received_data + cur_probes_str_len + 3) != hello.msg_size + 1
 				|| received_data[cur_probes_str_len + 3 + hello.msg_size] != '\n') {
-				msg_send = ERROR_MEASUREMENT_PHASE; // error message
+				response = ERROR_MEASUREMENT_PHASE; // error message
 				error = true;
 			}
 			sleep(hello.server_delay);
-			send(newsfd, msg_send, strlen(msg_send), 0);
-			printf("Server msg: %s\n", msg_send);
+			send(newsfd, response, strlen(response), 0);
+			printf("Server msg: %s\n", response);
 			// if error, terminate connection, go back to wait state
 			if (error) {
 				close(newsfd);
@@ -130,16 +180,16 @@ int main(int argc, char *argv[]) {
 			printf("Client msg: %s\n", received_data);
 			// If it's another probe message, terminate connection
 			if (byte_recv > 2) {
-				msg_send = ERROR_MEASUREMENT_PHASE;
-				send(newsfd, msg_send, strlen(msg_send), 0);
+				response = ERROR_MEASUREMENT_PHASE;
+				send(newsfd, response, strlen(response), 0);
 				close(newsfd);
 			} else if (byte_recv == 2 && strncmp(received_data, BYE_MSG, 2) == 0) {
-				msg_send = OK_BYE_PHASE;
+				response = OK_BYE_PHASE;
 			} else {
-				msg_send = ERROR_BYE_PHASE;
+				response = ERROR_BYE_PHASE;
 			}
-			send(newsfd, msg_send, strlen(msg_send), 0);
-			printf("Server msg: %s\n", msg_send);
+			send(newsfd, response, strlen(response), 0);
+			printf("Server msg: %s\n", response);
 			//terminate connection
 			close(newsfd);
 		}
