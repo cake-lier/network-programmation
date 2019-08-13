@@ -9,7 +9,7 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 
-#define MAX_BUF_SIZE 1024
+#define MAX_BUF_SIZE 65000
 #define BYE_MSG "b\n"
 #define OK_HELLO_PHASE  "200 OK - Ready"
 #define ERROR_HELLO_PHASE "404 ERROR – Invalid Hello message"
@@ -91,12 +91,14 @@ int main(int argc, char *argv[]) {
 			//----------------------------------------
 	        //------------- Hello phase --------------
 	        //----------------------------------------
+			memset(received_data, '\0', MAX_BUF_SIZE);
 			if (recv(newsfd, received_data, MAX_BUF_SIZE, 0) < 0) {
 				perror("Error in \"recv\" function during Hello phase\n");
 				exit(EXIT_FAILURE);
 			}
-			//check if the hello message starts with "h" and ends with "\n"
+			printf("Client msg: %s\n", received_data);
 
+			//check if the hello message starts with "h" and ends with "\n"
 			size_t received_length = strlen(received_data);
 			if (received_data[received_length - 1] != '\n' || received_data[0] != 'h') {
 				error = true;
@@ -164,6 +166,7 @@ int main(int argc, char *argv[]) {
 				response = ERROR_MEASUREMENT_PHASE; // error message
 				error = true;
 			}
+			free(cur_probes_str);
 			sleep(hello.server_delay);
 			send(newsfd, response, strlen(response), 0);
 			printf("Server msg: %s\n", response);
@@ -199,12 +202,13 @@ int main(int argc, char *argv[]) {
 }
 
 char *parse_to_string(unsigned int i) {
-	char *tmp = calloc(12, sizeof(char));
+	size_t length = (unsigned int)snprintf(NULL, 0, "%d", i);
+	char *tmp = malloc((length + 1) * sizeof(char));
+
 	if (tmp == NULL) {
 		printf("Not enough memory\n");
 		exit(EXIT_FAILURE);
 	}
-	sprintf(tmp, "%d", i);
-	tmp = realloc(tmp, strlen(tmp));
+	snprintf(tmp, length + 1, "%d", i);
 	return tmp;
 }

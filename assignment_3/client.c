@@ -10,7 +10,7 @@
 #include <stdbool.h>
 #include <time.h>
 
-#define MAX_BUF_SIZE 1024
+#define MAX_BUF_SIZE 65000
 #define BYE_MSG "b\n"
 #define ERROR_HELLO_PHASE "404 ERROR – Invalid Hello message"
 
@@ -77,17 +77,19 @@ int main(int argc, char *argv[]) {
 			//------------- Hello phase --------------
 			//----------------------------------------
 			//initialise hello message
-			sprintf(sent_data, "h %d %d %d %d\n", hello.type, hello.n_probes, hello.msg_size, hello.server_delay);
-			printf("Sending the following Hello message to the server: %s", sent_data);
+			snprintf(sent_data, MAX_BUF_SIZE, "h %d %d %d %d\n", hello.type, hello.n_probes, hello.msg_size, hello.server_delay);
+			printf("Sending the following hello message to the server: %s\n", sent_data);
 			//send message
 			if (send(sfd, sent_data, strlen(sent_data), 0) < 0) {
-				printf("Error in \"send\" function during Hello phase\n");
+				printf("Error in \"send\" function during hello phase\n");
 				exit(EXIT_FAILURE);
 			}
+			memset(received_data, '\0', MAX_BUF_SIZE);
 			if (recv(sfd, received_data, MAX_BUF_SIZE, 0) < 0) {
-				perror("Error in \"recv\" function during Hello phase\n");
+				perror("Error in \"recv\" function during hello phase\n");
 				exit(EXIT_FAILURE);
 			}
+			printf("Server msg: %s\n", received_data);
 			if (strncmp(received_data, ERROR_HELLO_PHASE, strlen(ERROR_HELLO_PHASE)) == 0) {
 				error = true;
 				close(sfd);
@@ -110,7 +112,9 @@ int main(int argc, char *argv[]) {
         for (unsigned int seq_num = 1; seq_num <= hello.n_probes; seq_num++) {
             // Creation of complete probe message
             // <phase> <sp> <probe_seq_num> <sp> <payload> <\n>
-            char *str_seq_num = calloc(12, sizeof(char));
+        		size_t str_seq_num_len = (unsigned int)snprintf(NULL, 0, "%d", seq_num);
+            char *str_seq_num = malloc((str_seq_num_len + 1) * sizeof(char));
+            char *prefix_probe_msg;
             char *probe_msg;
             struct timespec time_start;
             struct timespec time_end;
@@ -119,14 +123,14 @@ int main(int argc, char *argv[]) {
             		printf("Not enough memory\n");
             		exit(EXIT_FAILURE);
             }
-            sprintf(str_seq_num, "%d", seq_num);
-            str_seq_num = realloc(str_seq_num, strlen(str_seq_num));
-            probe_msg = strcat_space("m", str_seq_num);
+            snprintf(str_seq_num, str_seq_num_len + 1, "%d", seq_num);
+            prefix_probe_msg = strcat_space("m", str_seq_num);
             free(str_seq_num);
-            probe_msg = strcat_space(probe_msg, payload);
+            probe_msg = strcat_space(prefix_probe_msg, payload);
+            free(prefix_probe_msg);
 
             size_t orig_probe_size = strlen(probe_msg);
-            probe_msg = realloc(probe_msg, orig_probe_size + 2);
+            probe_msg = realloc(probe_msg, (orig_probe_size + 2) * sizeof(char));
             if (probe_msg == NULL) {
             		printf("Not enough memory\n");
             		exit(EXIT_FAILURE);
@@ -193,17 +197,22 @@ int main(int argc, char *argv[]) {
 }
 
 char *strcat_space(char *first, char *second){
-    char *space = " ";
-    char *third = malloc(strlen(first) + strlen(second) + sizeof(char));
+    char *third = malloc(strlen(first) + strlen(second) + 2 * sizeof(char));
+
+    if (third == NULL) {
+    		printf("Not enough memory\n");
+    		exit(EXIT_FAILURE);
+    }
     third[0] = '\0';
     strcat(third, first);
-    strcat(third, space);
+    strcat(third, " ");
     strcat(third, second);
 	return third;
 }
 
 double timespec_diff(struct timespec *time_start, struct timespec *time_end) {
 	struct timespec result;
+
     if (time_end->tv_nsec - time_start->tv_nsec < 0) {
         result.tv_sec = time_end->tv_sec - time_start->tv_sec - 1;
         result.tv_nsec = time_end->tv_nsec - time_start->tv_nsec + 1000000000L;
