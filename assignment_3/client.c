@@ -9,8 +9,9 @@
 #include <netinet/in.h>
 #include <stdbool.h>
 #include <time.h>
+#include <stdint.h>
 
-#define MAX_BUF_SIZE 65000
+#define MAX_BUF_SIZE UINT16_MAX
 #define BYE_MSG "b\n"
 #define ERROR_HELLO_PHASE "404 ERROR – Invalid Hello message"
 
@@ -53,7 +54,7 @@ int main(int argc, char *argv[]) {
     while (true) {
 		sfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 		if (sfd < 0) {
-			perror("socket"); // Print error message
+			perror("Error in \"socket\" function"); // Print error message
 			exit(EXIT_FAILURE);
 		}
 		do {
@@ -78,18 +79,18 @@ int main(int argc, char *argv[]) {
 			//----------------------------------------
 			//initialise hello message
 			snprintf(sent_data, MAX_BUF_SIZE, "h %d %d %d %d\n", hello.type, hello.n_probes, hello.msg_size, hello.server_delay);
-			printf("Sending the following hello message to the server: %s\n", sent_data);
+			printf("[C] Client sent hello message: %s\n", sent_data);
 			//send message
 			if (send(sfd, sent_data, strlen(sent_data), 0) < 0) {
-				printf("Error in \"send\" function during hello phase\n");
+				printf("Error in \"send\" function");
 				exit(EXIT_FAILURE);
 			}
 			memset(received_data, '\0', MAX_BUF_SIZE);
 			if (recv(sfd, received_data, MAX_BUF_SIZE, 0) < 0) {
-				perror("Error in \"recv\" function during hello phase\n");
+				perror("Error in \"recv\" function");
 				exit(EXIT_FAILURE);
 			}
-			printf("Server msg: %s\n", received_data);
+			printf("[C] Server response to hello message: %s\n", received_data);
 			if (strncmp(received_data, ERROR_HELLO_PHASE, strlen(ERROR_HELLO_PHASE)) == 0) {
 				error = true;
 				close(sfd);
@@ -130,6 +131,8 @@ int main(int argc, char *argv[]) {
             free(prefix_probe_msg);
 
             size_t orig_probe_size = strlen(probe_msg);
+			char *current_buffer_pos = received_data;
+			ssize_t total_msg_size = 0;
             probe_msg = realloc(probe_msg, (orig_probe_size + 2) * sizeof(char));
             if (probe_msg == NULL) {
             		printf("Not enough memory\n");
@@ -138,7 +141,7 @@ int main(int argc, char *argv[]) {
             probe_msg[orig_probe_size] = '\n';
             probe_msg[orig_probe_size + 1] = '\0';
             // Send probe message to server
-            printf("Client msg: %s\n", probe_msg);
+            printf("[C] Client sent probe message: %s\n", probe_msg);
             memset(received_data, '\0', MAX_BUF_SIZE);
             clock_gettime(CLOCK_MONOTONIC, &time_start);
             if (send(sfd, probe_msg, strlen(probe_msg), 0) < 0){
@@ -146,13 +149,22 @@ int main(int argc, char *argv[]) {
                 exit(EXIT_FAILURE);
             }
             // Read response from server
-            byte_recv = recv(sfd, received_data, MAX_BUF_SIZE, 0);
+            do {
+            		char tmp_buffer[MAX_BUF_SIZE];
+
+            		byte_recv = recv(sfd, tmp_buffer, MAX_BUF_SIZE, 0);
+            		if (total_msg_size + byte_recv < MAX_BUF_SIZE) {
+            			total_msg_size += byte_recv;
+            			strncpy(current_buffer_pos, tmp_buffer, (size_t)byte_recv);
+            			current_buffer_pos += byte_recv;
+            		}
+            } while (*(current_buffer_pos - 1) != '\n' && total_msg_size < MAX_BUF_SIZE);
            	clock_gettime(CLOCK_MONOTONIC, &time_end);
 
            	double rtt = timespec_diff(&time_start, &time_end);
-           	printf("Probe n.%d took %g ms\n", seq_num, rtt);
+           	printf("Probe n. %d took %g ms\n", seq_num, rtt);
            	sum_rtt += rtt;
-            printf("Server msg: %s\n", received_data);
+            printf("[C] Server response to probe message: %s\n", received_data);
             //If messages aren't the same, close socket and go back to waiting user input
             if (strncmp(received_data, probe_msg, strlen(received_data)) != 0) {
             		error = true;
@@ -168,14 +180,14 @@ int main(int argc, char *argv[]) {
         if (hello.type == RTT) {
     			FILE *fp = fopen("rtt_test.txt", "a");
 
-        		printf("Average RTT calculated %g ms\n", avg_rtt);
+        		printf("Average RTT calculated: %g ms\n", avg_rtt);
         		fprintf(fp, "%d,%d,%g\n", hello.msg_size, hello.server_delay, avg_rtt);
         		fclose(fp);
         } else if (hello.type == THPUT) {
         		double avg_thruput = ((double)byte_recv * 8) / avg_rtt;
         		FILE *fp = fopen("thput_test.txt", "a");
 
-        		printf("Average throughput calculated %g kbps\n", avg_thruput);
+        		printf("Average throughput calculated: %g kbps\n", avg_thruput);
         		fprintf(fp, "%g,%d,%g\n", (double)byte_recv * 8 / 1000, hello.server_delay, avg_thruput);
         		fclose(fp);
         }
@@ -184,12 +196,18 @@ int main(int argc, char *argv[]) {
             //-------------- Bye phase ---------------
             //----------------------------------------
             // Send bye message to server
-            send(sfd, BYE_MSG, strlen(BYE_MSG), 0);
-            printf("Client msg: %s\n", BYE_MSG);
+            if (send(sfd, BYE_MSG, strlen(BYE_MSG), 0) < 0) {
+            		perror("Error in \"send\" message");
+            		exit(EXIT_FAILURE);
+            }
+            printf("[C] Client sent bye message: %s\n", BYE_MSG);
             // Read response from server
             memset(received_data, '\0', MAX_BUF_SIZE);
-            recv(sfd, received_data, MAX_BUF_SIZE, 0);
-            printf("Server msg: %s\n", received_data);
+            if (recv(sfd, received_data, MAX_BUF_SIZE, 0) < 0) {
+            		perror("Error in \"recv\" message");
+            	    exit(EXIT_FAILURE);
+            }
+            printf("[C] Server response to bye message: %s\n", received_data);
             close(sfd);
         }
     }

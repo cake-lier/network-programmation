@@ -8,8 +8,9 @@
 #include <stdbool.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <stdint.h>
 
-#define MAX_BUF_SIZE 65000
+#define MAX_BUF_SIZE UINT16_MAX
 #define BYE_MSG "b\n"
 #define OK_HELLO_PHASE  "200 OK - Ready"
 #define ERROR_HELLO_PHASE "404 ERROR – Invalid Hello message"
@@ -93,10 +94,10 @@ int main(int argc, char *argv[]) {
 	        //----------------------------------------
 			memset(received_data, '\0', MAX_BUF_SIZE);
 			if (recv(newsfd, received_data, MAX_BUF_SIZE, 0) < 0) {
-				perror("Error in \"recv\" function during Hello phase\n");
+				perror("Error in \"recv\" function");
 				exit(EXIT_FAILURE);
 			}
-			printf("Client msg: %s\n", received_data);
+			printf("[S] Client sent hello message: %s\n", received_data);
 
 			//check if the hello message starts with "h" and ends with "\n"
 			size_t received_length = strlen(received_data);
@@ -109,14 +110,17 @@ int main(int argc, char *argv[]) {
 				int numFields = 0;
 				int values[4];
 
-				while ((tmp = strtok(NULL, " ")) != NULL && numFields < 4) {
+				while ((tmp = strtok(NULL, " ")) != NULL) {
+					if (numFields == 4) {
+						error = true;
+						break;
+					}
 					values[numFields] = atoi(tmp);
 					numFields++;
 				}
 				/*if numFields is different than 4 then there are fewer or more fields than allowed
 				otherwise check if the received values are correct*/
-				if (numFields != 4 || !(values[0] == 0 || values[0] == 1)
-				|| values[1] < 20 || values[2] < 0 || values[3] < 0) {
+				if (!(values[0] == 0 || values[0] == 1) || values[1] < 20 || values[2] < 0 || values[3] < 0) {
 					error = true;
 				}
 				//initialise hello
@@ -131,27 +135,35 @@ int main(int argc, char *argv[]) {
 				response = OK_HELLO_PHASE;
 			}
 			if (send(newsfd, response, strlen(response), 0) < 0) {
-				perror("Error in \"send\" function during Hello phase\n");
+				perror("Error in \"send\" function");
 				exit(EXIT_FAILURE);
 			}
-			printf("Server msg: %s\n", response);
+			printf("[S] Server response to hello message: %s\n", response);
 			if (error) {
-				if (close(newsfd) < 0){
-					perror("Error in \"close\" function during Hello phase\n");
-					exit(EXIT_FAILURE);
-				}
+				close(newsfd);
 			}
 		} while (error);
 		//----------------------------------------
         //---------- Measurement phase -----------
         //----------------------------------------
 		for (unsigned int current_probes = 1; current_probes <= hello.n_probes; current_probes++) {
+			char *current_buffer_pos = received_data;
+			ssize_t total_msg_size = 0;
 			// Receive probe messages from client
 			memset(received_data, '\0', MAX_BUF_SIZE);
-			byte_recv = recv(newsfd, received_data, MAX_BUF_SIZE, 0);
-			printf("Client msg: %s\n", received_data);
-			if(byte_recv < 0){
-				perror("Error in receiving probe message");
+			do {
+				char tmp_buffer[MAX_BUF_SIZE];
+
+				byte_recv = recv(newsfd, tmp_buffer, MAX_BUF_SIZE, 0);
+				if (total_msg_size + byte_recv < MAX_BUF_SIZE) {
+					total_msg_size += byte_recv;
+					strncpy(current_buffer_pos, tmp_buffer, (size_t)byte_recv);
+					current_buffer_pos += byte_recv;
+				}
+			} while (*(current_buffer_pos - 1) != '\n' && total_msg_size < MAX_BUF_SIZE);
+			printf("[S] Client sent probe message: %s\n", received_data);
+			if (byte_recv < 0) {
+				perror("Error in \"recv\" function");
 				exit(EXIT_FAILURE);
 			}
 			// Check if probe message is valid
@@ -169,7 +181,7 @@ int main(int argc, char *argv[]) {
 			free(cur_probes_str);
 			sleep(hello.server_delay);
 			send(newsfd, response, strlen(response), 0);
-			printf("Server msg: %s\n", response);
+			printf("[S] Server response to probe message: %s\n", response);
 			// if error, terminate connection, go back to wait state
 			if (error) {
 				close(newsfd);
@@ -180,7 +192,7 @@ int main(int argc, char *argv[]) {
 			// Receive message from client
 			memset(received_data, '\0', MAX_BUF_SIZE);
 			byte_recv = recv(newsfd, received_data, MAX_BUF_SIZE, 0);
-			printf("Client msg: %s\n", received_data);
+			printf("[S] Client sent bye message: %s\n", received_data);
 			// If it's another probe message, terminate connection
 			if (byte_recv > 2) {
 				response = ERROR_MEASUREMENT_PHASE;
@@ -192,7 +204,7 @@ int main(int argc, char *argv[]) {
 				response = ERROR_BYE_PHASE;
 			}
 			send(newsfd, response, strlen(response), 0);
-			printf("Server msg: %s\n", response);
+			printf("[S] Server response to bye message: %s\n", response);
 			//terminate connection
 			close(newsfd);
 		}
