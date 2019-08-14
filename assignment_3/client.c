@@ -37,10 +37,11 @@ int main(int argc, char *argv[]) {
 	struct sockaddr_in server_addr; // struct containing server address information
 	int sfd = 0; // Server socket filed descriptor
 	ssize_t byte_recv = 0;
+	ssize_t total_msg_size;
 	char received_data[MAX_BUF_SIZE]; // Data to be received
 	char sent_data[MAX_BUF_SIZE];
 	hello_msg hello; // Hello message data
-    double sum_rtt = 0;
+    double sum_rtt;
     bool error;
 
     if (argc != 3) {
@@ -109,6 +110,7 @@ int main(int argc, char *argv[]) {
             payload[i] = 'F';
         }
         payload[hello.msg_size] = '\0';
+        sum_rtt = 0;
         // Send probe messages
         for (unsigned int seq_num = 1; seq_num <= hello.n_probes; seq_num++) {
             // Creation of complete probe message
@@ -132,7 +134,7 @@ int main(int argc, char *argv[]) {
 
             size_t orig_probe_size = strlen(probe_msg);
 			char *current_buffer_pos = received_data;
-			ssize_t total_msg_size = 0;
+			total_msg_size = 0;
             probe_msg = realloc(probe_msg, (orig_probe_size + 2) * sizeof(char));
             if (probe_msg == NULL) {
             		printf("Not enough memory\n");
@@ -181,14 +183,14 @@ int main(int argc, char *argv[]) {
     			FILE *fp = fopen("rtt_test.txt", "a");
 
         		printf("Average RTT calculated: %g ms\n", avg_rtt);
-        		fprintf(fp, "%d,%d,%g\n", hello.msg_size, hello.server_delay, avg_rtt);
+        		fprintf(fp, "%d,%d,%.6f\n", hello.msg_size, hello.server_delay, avg_rtt);
         		fclose(fp);
         } else if (hello.type == THPUT) {
-        		double avg_thruput = ((double)byte_recv * 8) / avg_rtt;
+        		double avg_thruput = ((double)total_msg_size * 8) / avg_rtt;
         		FILE *fp = fopen("thput_test.txt", "a");
 
         		printf("Average throughput calculated: %g kbps\n", avg_thruput);
-        		fprintf(fp, "%g,%d,%g\n", (double)byte_recv * 8 / 1000, hello.server_delay, avg_thruput);
+        		fprintf(fp, "%.6f,%d,%.6f\n", ((double)total_msg_size * 8) / 1000, hello.server_delay, avg_thruput);
         		fclose(fp);
         }
         if (!error) {
