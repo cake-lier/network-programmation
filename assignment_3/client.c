@@ -27,23 +27,27 @@ typedef struct hello_msg {
     unsigned int server_delay;
 } hello_msg;
 
-// Merges the two given strings, in order, separated by a space
+//Reads value from stdin and checks if it's valid. If not, flushes input
+void safe_scanf(char *match_string, void *value);
+
+//Merges the two given strings, in order, separated by a space
 char *strcat_space(char *first, char *second);
 
 //Calculates the differences between two times with millisecond precision
 double timespec_diff(struct timespec *time_start, struct timespec *time_end);
 
 int main(int argc, char *argv[]) {
-    struct sockaddr_in server_addr; // struct containing server address information
-    int sfd = 0; // Server socket filed descriptor
+    struct sockaddr_in server_addr; //Struct containing server address information
+    int sfd = 0; //Socket file descriptor
     ssize_t byte_recv = 0;
-    ssize_t total_msg_size;
-    char received_data[MAX_BUF_SIZE]; // Data to be received
-    char sent_data[MAX_BUF_SIZE];
-    hello_msg hello; // Hello message data
-    double sum_rtt;
-    bool error;
+    ssize_t total_msg_size = 0;
+    char received_data[MAX_BUF_SIZE];    //Buffer for received data
+    char sent_data[MAX_BUF_SIZE];    //Buffer for sent data
+    hello_msg hello; //Hello message data
+    double sum_rtt = 0;
+    bool error = false;
 
+    //Get server IP and port as input parameters
     if (argc != 3) {
         printf("Wrong parameters number\n");
         printf("%s <server IP (dotted notation)> <server port>\n", argv[0]);
@@ -53,39 +57,44 @@ int main(int argc, char *argv[]) {
     server_addr.sin_port = htons((short unsigned int)atoi(argv[2]));
     server_addr.sin_addr.s_addr = inet_addr(argv[1]);
     while (true) {
-        sfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-        if (sfd < 0) {
-            perror("Error in \"socket\" function"); // Print error message
-            exit(EXIT_FAILURE);
-        }
         do {
+            //Create new socket
+            sfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+            if (sfd < 0) {
+                perror("Error in \"socket\" function");
+                exit(EXIT_FAILURE);
+            }
             error = false;
-            // Get required parameters from stdin
+            //Get required parameters from stdin
             do {
                 printf("Specify whether you want to measure RTT [0] or THROUGHPUT [1]\n");
-                scanf("%d", (int *)&hello.type);
-            } while (hello.type < 0 || hello.type > 1);
+                safe_scanf("%d", &hello.type);
+                if (hello.type != 0 && hello.type != 1) {
+                    printf("Please, insert either 0 or 1\n");
+                }
+            } while (hello.type != 0 && hello.type != 1);
             printf("Specify desired number of probes\n");
-            scanf("%u", &hello.n_probes);
+            safe_scanf("%u", &hello.n_probes);
             printf("Specify the number of bytes contained in the probe's payload\n");
-            scanf("%u", &hello.msg_size);
+            safe_scanf("%u", &hello.msg_size);
             printf("Specify desired server delay\n");
-            scanf("%u", &hello.server_delay);
+            safe_scanf("%u", &hello.server_delay);
             if (connect(sfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
-                perror("Error in \"connect\" function"); // Print error message
+                perror("Error in \"connect\" function");
                 exit(EXIT_FAILURE);
             }
             //----------------------------------------
             //------------- Hello phase --------------
             //----------------------------------------
-            //initialise hello message
+            //Initialise hello message
             snprintf(sent_data, MAX_BUF_SIZE, "h %d %d %d %d\n", hello.type, hello.n_probes, hello.msg_size, hello.server_delay);
             printf("[C] Client sent hello message: %s\n", sent_data);
-            //send message
+            //Send hello message
             if (send(sfd, sent_data, strlen(sent_data), 0) < 0) {
                 printf("Error in \"send\" function");
                 exit(EXIT_FAILURE);
             }
+            //Receive response to hello message
             memset(received_data, '\0', MAX_BUF_SIZE);
             if (recv(sfd, received_data, MAX_BUF_SIZE, 0) < 0) {
                 perror("Error in \"recv\" function");
@@ -100,7 +109,7 @@ int main(int argc, char *argv[]) {
         //----------------------------------------
         //---------- Measurement phase -----------
         //----------------------------------------
-        // Fill payload string so its size == hello.msg_size
+        // Fill payload string so it's size == hello.msg_size
         char *payload = malloc((hello.msg_size + 1) * sizeof(char));
         if (payload == NULL) {
             printf("Not enough memory\n");
@@ -110,15 +119,15 @@ int main(int argc, char *argv[]) {
             payload[i] = 'F';
         }
         payload[hello.msg_size] = '\0';
-        sum_rtt = 0;
         // Send probe messages
+        sum_rtt = 0;
         for (unsigned int seq_num = 1; seq_num <= hello.n_probes; seq_num++) {
             // Creation of complete probe message
             // <phase> <sp> <probe_seq_num> <sp> <payload> <\n>
             size_t str_seq_num_len = (unsigned int)snprintf(NULL, 0, "%d", seq_num);
             char *str_seq_num = malloc((str_seq_num_len + 1) * sizeof(char));
-            char *prefix_probe_msg;
-            char *probe_msg;
+            char *prefix_probe_msg = NULL;
+            char *probe_msg = NULL;
             struct timespec time_start;
             struct timespec time_end;
 
@@ -146,7 +155,7 @@ int main(int argc, char *argv[]) {
             printf("[C] Client sent probe message: %s\n", probe_msg);
             memset(received_data, '\0', MAX_BUF_SIZE);
             clock_gettime(CLOCK_MONOTONIC, &time_start);
-            if (send(sfd, probe_msg, strlen(probe_msg), 0) < 0) {
+            if (send(sfd, probe_msg, strlen(probe_msg), 0) < 0){
                 perror("Failed to send probe message");
                 exit(EXIT_FAILURE);
             }
@@ -163,6 +172,7 @@ int main(int argc, char *argv[]) {
             } while (*(current_buffer_pos - 1) != '\n' && total_msg_size < MAX_BUF_SIZE);
             clock_gettime(CLOCK_MONOTONIC, &time_end);
 
+            //Calculate elapsed RTT
             double rtt = timespec_diff(&time_start, &time_end);
             printf("Probe n. %d took %g ms\n", seq_num, rtt);
             sum_rtt += rtt;
@@ -178,15 +188,19 @@ int main(int argc, char *argv[]) {
         }
         free(payload);
 
+        //Calculate average RTT
         double avg_rtt = sum_rtt / hello.n_probes;
         if (hello.type == RTT) {
+            //If we are interested in RTT, print RTT data on log file
             FILE *fp = fopen("rtt_test.txt", "a");
 
             printf("Average RTT calculated: %g ms\n", avg_rtt);
             fprintf(fp, "%d,%d,%.6f\n", hello.msg_size, hello.server_delay, avg_rtt);
             fclose(fp);
         } else if (hello.type == THPUT) {
+            //If we are interested in throughput, calculate average throughput
             double avg_thruput = ((double)total_msg_size * 8) / avg_rtt;
+            //Then print throughput data to log file
             FILE *fp = fopen("thput_test.txt", "a");
 
             printf("Average throughput calculated: %g kbps\n", avg_thruput);
@@ -199,15 +213,15 @@ int main(int argc, char *argv[]) {
             //----------------------------------------
             // Send bye message to server
             if (send(sfd, BYE_MSG, strlen(BYE_MSG), 0) < 0) {
-                    perror("Error in \"send\" message");
-                    exit(EXIT_FAILURE);
+                perror("Error in \"send\" message");
+                exit(EXIT_FAILURE);
             }
             printf("[C] Client sent bye message: %s\n", BYE_MSG);
             // Read response from server
             memset(received_data, '\0', MAX_BUF_SIZE);
             if (recv(sfd, received_data, MAX_BUF_SIZE, 0) < 0) {
-                    perror("Error in \"recv\" message");
-                    exit(EXIT_FAILURE);
+                perror("Error in \"recv\" message");
+                exit(EXIT_FAILURE);
             }
             printf("[C] Server response to bye message: %s\n", received_data);
             close(sfd);
@@ -216,19 +230,33 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
+void safe_scanf(char *match_string, void *value) {
+    int char_read;
+
+    do {
+        char_read = scanf(match_string, value);
+        if (char_read < 1) {
+            int c;
+
+            printf("Input was invalid, please, reinsert it\n");
+            while((c = getchar()) != '\n' && c != EOF);
+        }
+    } while(char_read < 1);
+}
+
 char *strcat_space(char *first, char *second){
     char *third = malloc(strlen(first) + strlen(second) + 2 * sizeof(char));
 
     if (third == NULL) {
-            printf("Not enough memory\n");
-            exit(EXIT_FAILURE);
+        printf("Not enough memory\n");
+        exit(EXIT_FAILURE);
     }
     third[0] = '\0';
     strcat(third, first);
     strcat(third, " ");
     strcat(third, second);
     return third;
-}
+}    
 
 double timespec_diff(struct timespec *time_start, struct timespec *time_end) {
     struct timespec result;
