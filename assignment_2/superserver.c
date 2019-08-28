@@ -35,9 +35,9 @@ void free_resources(void);
 
 int main(int argc, char **argv, char **env) {
     struct sockaddr_in addr;
-    FILE *fp;
-    pid_t pid;
-    char ch;
+    FILE *fp = NULL;
+    pid_t pid = 0;
+    char ch = '\0';
     char* filename = "inetd.txt";
 
     addr.sin_family = AF_INET;
@@ -50,8 +50,8 @@ int main(int argc, char **argv, char **env) {
     //read one line at a time, each one representing a service
     ch = fgetc(fp);
     while (ch != EOF) {
-        char *path;
-        char *service_name;
+        char *path = NULL;
+        char *service_name = NULL;
         int i = 0;
         int path_length = 10;
         int service_length = 0;
@@ -72,7 +72,7 @@ int main(int argc, char **argv, char **env) {
             path[i] = ch;
             i++;
             if (i == path_length) {
-                char *tmp;
+                char *tmp = NULL;
 
                 path_length *= 2;
                 tmp = (char *)realloc(path, sizeof(char) * path_length);
@@ -319,7 +319,8 @@ int main(int argc, char **argv, char **env) {
 }
 
 void handle_signal(int sig) {
-    int child_pid, status;
+    int child_pid = 0;
+    int status = 0;
 
     child_pid = wait(&status);
     if (child_pid == -1) {
