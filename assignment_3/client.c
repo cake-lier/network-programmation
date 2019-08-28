@@ -53,6 +53,7 @@ int main(int argc, char *argv[]) {
         printf("%s <server IP (dotted notation)> <server port>\n", argv[0]);
         exit(EXIT_FAILURE);
     }
+    //Initialize server address information
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons((short unsigned int)atoi(argv[2]));
     server_addr.sin_addr.s_addr = inet_addr(argv[1]);

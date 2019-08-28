@@ -33,14 +33,14 @@ typedef struct hello_msg {
 char *parse_to_string(unsigned int i);
 
 int main(int argc, char *argv[]) {
-    struct sockaddr_in server_addr; // struct containing server address information
-    struct sockaddr_in client_addr; // struct containing client address information
-    int sfd; // Server socket filed descriptor
-    int newsfd; // Client communication socket - Accept result
-    ssize_t byte_recv; // Number of bytes received
+    struct sockaddr_in server_addr; //Struct containing server address information
+    struct sockaddr_in client_addr; //Struct containing client address information
+    int sfd = 0; //Welcome socket file descriptor
+    int newsfd = 0; //Communication socket file descriptor
+    ssize_t byte_recv = 0;
     socklen_t cli_size = sizeof(client_addr);
-    char received_data[MAX_BUF_SIZE]; // Data to be received
-    char *response;
+    char received_data[MAX_BUF_SIZE]; //Buffer for received data
+    char *response = NULL;
     hello_msg hello; //Hello message data
 
     if (argc != 2) {
@@ -48,20 +48,21 @@ int main(int argc, char *argv[]) {
         printf("%s <server port>\n", argv[0]);
         exit(EXIT_FAILURE);
     }
+    //Create new welcome socket
     sfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (sfd < 0) {
         perror("Error on \"socket\" function");
         exit(EXIT_FAILURE);
     }
-    // Initialize server address information
+    //Initialize server address information
     server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons((short unsigned int)atoi(argv[1])); // Convert to network byte order
-    server_addr.sin_addr.s_addr = INADDR_ANY; // Bind to any address
+    server_addr.sin_port = htons((short unsigned int)atoi(argv[1]));
+    server_addr.sin_addr.s_addr = INADDR_ANY;
     if (bind(sfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
         perror("Error on \"bind\" function");
         exit(EXIT_FAILURE);
     }
-    // Mark sfd socket as receptive to connections
+    //Mark sfd socket as receptive to connections
     if (listen(sfd, SOMAXCONN) < 0) {
         perror("Error on \"listen\" function");
         exit(EXIT_FAILURE);
@@ -70,13 +71,14 @@ int main(int argc, char *argv[]) {
         bool error = false;
 
         do {
-            // Wait for incoming requests
-            // newsfd is the socket to which client is connected
+            //Wait for incoming requests
+            //"newsfd" is the communication socket
             newsfd = accept(sfd, (struct sockaddr *)&client_addr, &cli_size);
             if (newsfd < 0) {
                 perror("Error on \"accept\" function");
                 exit(EXIT_FAILURE);
             }
+            //Print connected client IP and port
             char *dotted_addr = malloc(sizeof(char) * (INET_ADDRSTRLEN + 1));
             if (dotted_addr == NULL) {
                 printf("Not enough memory\n");
@@ -92,6 +94,7 @@ int main(int argc, char *argv[]) {
             //----------------------------------------
             //------------- Hello phase --------------
             //----------------------------------------
+            //Hello message reception
             memset(received_data, '\0', MAX_BUF_SIZE);
             if (recv(newsfd, received_data, MAX_BUF_SIZE, 0) < 0) {
                 perror("Error in \"recv\" function");
@@ -99,17 +102,17 @@ int main(int argc, char *argv[]) {
             }
             printf("[S] Client sent hello message: %s\n", received_data);
 
-            //check if the hello message starts with "h" and ends with "\n"
+            //Check if the hello message starts with "h" and ends with "\n"
             size_t received_length = strlen(received_data);
             if (received_data[received_length - 1] != '\n' || received_data[0] != 'h') {
                 error = true;
             }
             if (!error) {
-                //save received_data values
                 char *tmp = strtok(received_data, " ");
                 int numFields = 0;
                 int values[4];
 
+                //Save hello message values into temporary array "values"
                 while ((tmp = strtok(NULL, " ")) != NULL) {
                     if (numFields == 4) {
                         error = true;
@@ -118,12 +121,11 @@ int main(int argc, char *argv[]) {
                     values[numFields] = atoi(tmp);
                     numFields++;
                 }
-                /*if numFields is different than 4 then there are fewer or more fields than allowed
-                otherwise check if the received values are correct*/
+                //Check if the received values are correct
                 if (!(values[0] == 0 || values[0] == 1) || values[1] < 20 || values[2] < 0 || values[3] < 0) {
                     error = true;
                 }
-                //initialise hello
+                //Initialise hello message data structure
                 hello.type = values[0];
                 hello.n_probes = (unsigned int)values[1];
                 hello.msg_size = (unsigned int)values[2];
@@ -134,6 +136,7 @@ int main(int argc, char *argv[]) {
             } else {
                 response = OK_HELLO_PHASE;
             }
+            //Send response to hello message
             if (send(newsfd, response, strlen(response), 0) < 0) {
                 perror("Error in \"send\" function");
                 exit(EXIT_FAILURE);
@@ -149,7 +152,7 @@ int main(int argc, char *argv[]) {
         for (unsigned int current_probes = 1; current_probes <= hello.n_probes; current_probes++) {
             char *current_buffer_pos = received_data;
             ssize_t total_msg_size = 0;
-            // Receive probe messages from client
+            //Receive probe message from client
             memset(received_data, '\0', MAX_BUF_SIZE);
             do {
                 char tmp_buffer[MAX_BUF_SIZE];
@@ -169,35 +172,37 @@ int main(int argc, char *argv[]) {
             // Check if probe message is valid
             char *cur_probes_str = parse_to_string(current_probes);
             size_t cur_probes_str_len = strlen(cur_probes_str);
-            response = received_data; // default echo
+            response = received_data; //Default behavior is to echo the received probe
             if (strncmp(received_data, "m ", 2) != 0
                 || strncmp(received_data + 2, cur_probes_str, cur_probes_str_len) != 0
                 || received_data[cur_probes_str_len + 2] != ' '
                 || strlen(received_data + cur_probes_str_len + 3) != hello.msg_size + 1
                 || received_data[cur_probes_str_len + 3 + hello.msg_size] != '\n') {
-                response = ERROR_MEASUREMENT_PHASE; // error message
+                response = ERROR_MEASUREMENT_PHASE;
                 error = true;
             }
             free(cur_probes_str);
             sleep(hello.server_delay);
+            //Send response to probe message
             send(newsfd, response, strlen(response), 0);
             printf("[S] Server response to probe message: %s\n", response);
-            // if error, terminate connection, go back to wait state
+            //On error, terminate connection, go back to wait state
             if (error) {
                 close(newsfd);
                 break;
             }
         }
         if (!error) {
-            // Receive message from client
+            //Receive a message from client
             memset(received_data, '\0', MAX_BUF_SIZE);
             byte_recv = recv(newsfd, received_data, MAX_BUF_SIZE, 0);
             printf("[S] Client sent bye message: %s\n", received_data);
-            // If it's another probe message, terminate connection
+            //If it's another probe message, terminate connection with error message
             if (byte_recv > 2) {
                 response = ERROR_MEASUREMENT_PHASE;
                 send(newsfd, response, strlen(response), 0);
                 close(newsfd);
+            //Otherwise close connection gracefully with OK or error message
             } else if (byte_recv == 2 && strncmp(received_data, BYE_MSG, 2) == 0) {
                 response = OK_BYE_PHASE;
             } else {
@@ -205,7 +210,6 @@ int main(int argc, char *argv[]) {
             }
             send(newsfd, response, strlen(response), 0);
             printf("[S] Server response to bye message: %s\n", response);
-            //terminate connection
             close(newsfd);
         }
     }
