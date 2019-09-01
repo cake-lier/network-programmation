@@ -267,7 +267,7 @@ int main(int argc, char **argv, char **env) {
                         //close the communication socket in case of tcp protocol
                         if (strncmp(services[i].protocol, "tcp", 3) == 0) {
                             if (close(newSock) == -1) {
-                                perror("Error while closing the connected socket\n");
+                                perror("Error on \"close\" function");
                                 free_resources();
                                 exit(EXIT_FAILURE);
                             }
@@ -278,7 +278,7 @@ int main(int argc, char **argv, char **env) {
                             services[i].pid = pid;
                             FD_CLR(services[i].socket_fd, &sockfd_set);
                         }
-                        //son process
+                    //son process
                     } else if (pid == 0) {
                         //close stdin, stdout, stderr
                         close(0);
@@ -288,7 +288,7 @@ int main(int argc, char **argv, char **env) {
                         //close welcome socket in case of tcp protocol
                         if (strncmp(services[i].protocol, "tcp", 3) == 0) {
                             if(close(services[i].socket_fd) == -1){
-                                perror("Error while closing the connected socket\n");
+                                perror("Error on \"close\" function");
                                 free_resources();
                                 exit(EXIT_FAILURE);
                             }
@@ -299,7 +299,7 @@ int main(int argc, char **argv, char **env) {
                         //in case of udp protocol
                         for(int i = 0; i < 3; i++){
                             if(dup(tmp_sock) == -1){
-                                perror("Error on dup(fd)\n");
+                                perror("Error on \"dup\" function");
                                 free_resources();
                                 exit(EXIT_FAILURE);
                             }

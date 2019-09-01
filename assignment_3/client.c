@@ -13,7 +13,7 @@
 
 #define MAX_BUF_SIZE UINT16_MAX
 #define BYE_MSG "b\n"
-#define ERROR_HELLO_PHASE "404 ERROR – Invalid Hello message"
+#define OK_HELLO_PHASE "200 OK - Ready"
 
 typedef enum message_type {
     RTT,
@@ -102,7 +102,7 @@ int main(int argc, char *argv[]) {
                 exit(EXIT_FAILURE);
             }
             printf("[C] Server response to hello message: %s\n", received_data);
-            if (strncmp(received_data, ERROR_HELLO_PHASE, strlen(ERROR_HELLO_PHASE)) == 0) {
+            if (strncmp(received_data, OK_HELLO_PHASE, strlen(OK_HELLO_PHASE)) != 0) {
                 error = true;
                 close(sfd);
             }

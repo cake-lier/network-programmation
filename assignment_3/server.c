@@ -12,7 +12,7 @@
 
 #define MAX_BUF_SIZE UINT16_MAX
 #define BYE_MSG "b\n"
-#define OK_HELLO_PHASE  "200 OK - Ready"
+#define OK_HELLO_PHASE "200 OK - Ready"
 #define ERROR_HELLO_PHASE "404 ERROR – Invalid Hello message"
 #define OK_BYE_PHASE "200 OK - Closing"
 #define ERROR_BYE_PHASE "404 ERROR - Invalid Bye message"

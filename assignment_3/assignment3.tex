@@ -81,14 +81,14 @@ inviato e, una volta ricevuto, chiude la connessione, ritornando allo stato di a
 
 Il server per essere eseguito necessita di ricevere la porta della \textit{socket} su cui si metterà in ascolto per nuove connessioni in ingresso
 come parametro iniziale.\newline
-Dopo aver creato la \textit{socket} ``TCP" di benvenuto, il \textit{server} entra in un \textit{loop} infinito dove si mette in ascolto per eventuali
+Dopo aver creato la \textit{socket} TCP di benvenuto, il \textit{server} entra in un \textit{loop} infinito dove si mette in ascolto per eventuali
 richieste di connessione da parte dei \textit{client}; in questo modo, dopo la chiusura di una connessione, il \textit{server} torna in ascolto,
 eliminando così la necessità di riavviare il programma.\newline
-Dopo avere registrato l'indirizzo \textit{IP} e la porta del \textit{client}, il server si mette in attesa dell'``\textit{hello message}". Una volta
+Dopo avere registrato l'indirizzo IP e la porta del \textit{client}, il server si mette in attesa dell'``\textit{hello message}". Una volta
 ricevuto ed assicuratosi che sia valido, salva i dati in esso contenuti in un'apposita \textit{struct} di tipo ``struct hello\_msg". In seguito,
 tramite un ciclo ``for", si mette in attesa di un numero ``probe message" pari a quello estratto dall'``\textit{hello message}". La ricezione di
 un ``probe message" avviene in un ciclo ``do-while" perché in alcuni test è risultato che la funzione ``recv" non riuscisse a leggere più di
-32.768 \textit{byte} alla volta, mentre alcuni di questi messaggi risultavano più lunghi di questa quantità. In questo modo, leggendo il messaggio 
+32.768 byte alla volta, mentre alcuni di questi messaggi risultavano più lunghi di questa quantità. In questo modo, leggendo il messaggio 
 un po' alla volta, si riesce ad ottenerlo tutto. Dopo aver controllato che
 il messaggio sia valido, il \textit{server} attende il numero di secondi specificato come ``\textit{server delay}" nell'``\textit{hello message}"
 prima di inviare lo stesso messaggio indietro al \textit{client}.\newline
@@ -112,12 +112,12 @@ l'intervallo di tempo che rappresenta l'RTT di quello specifico ``\textit{probe 
 dell'RTT, viene accodato ad uno specifico file - ``rtt\_test.txt" - una nuova riga con, nell'ordine, la dimensione del \textit{payload}, 
 il ``\textit{server delay}" utilizzato e il valore medio misurato.\newline
 Se invece si voleva misurare il \textit{throughput}, viene divisa la dimensione dell'ultimo ``\textit{probe message}" inviato
-per il valore medio dell'RTT calcolato. Questo per semplificare la scelta della dimensione del messaggio perché non tutti i ``probe
-message" hanno la stessa dimensione, avendo il campo del numero di sequenza progressivo al loro interno che richiede un sempre maggior numero di 
-\textit{byte} mano a mano che i ``probe message" vengono inviati. Una volta calcolato il \textit{throughput}, anche in questo caso viene aperto un
-file apposito - ``thput\_test.txt" - a cui viene accodata una nuova riga con specificati, nell'ordine, la dimensione dei ``probe message" inviati
+per il valore medio dell'RTT calcolato. Questo per semplificare la scelta della dimensione del messaggio perché non tutti i ``\textit{probe
+message}" hanno la stessa dimensione, avendo il campo del numero di sequenza progressivo al loro interno che richiede un sempre maggior numero di 
+byte mano a mano che i ``\textit{probe message}" vengono inviati. Una volta calcolato il \textit{throughput}, anche in questo caso viene aperto un
+file apposito - ``thput\_test.txt" - a cui viene accodata una nuova riga con specificati, nell'ordine, la dimensione dei ``\textit{probe message}" inviati
 scelta come indicato poco sopra, il ``\textit{server delay}" scelto ed infine il \textit{throughput} calcolato.
-Al termine, il \textit{client} chiede di terminare la connessione ``TCP"; pertanto si effettua una sola misurazione, dell'RTT o del 
+Al termine, il \textit{client} chiede di terminare la connessione TCP; pertanto si effettua una sola misurazione, dell'RTT o del 
 \textit{throughput}, per connessione.
 
 \section{Grafici ottenuti dalle misurazioni}
@@ -133,7 +133,7 @@ differenza che il \textit{client} è posizionato nei pressi di Qingtian, in Cina
 \begin{figure}[H]
 	\centering
 	\includegraphics[width=\linewidth]{images/nodelay.png}
-	\caption{Grafici con i test effettuati senza ``server delay"}
+	\caption{Grafici con i test effettuati senza ``\textit{server delay}"}
 \end{figure}
 
 All'aumentare della distanza tra \textit{client} e \textit{server} tra i vari grafici, l'RTT aumenta il proprio ordine di grandezza, passando
@@ -142,20 +142,20 @@ valore dell'RTT.\newline
 Per il \textit{throughput}, anziché aumentare gli ordini di grandezza muovendosi verso destra tra i grafici, quello che succede è che l'ordine
 di grandezza cala. Questo perché i dati inviati mantengono un'insieme di dimensioni costanti tra i test, mentre l'RTT aumenta.\newline
 All'aumentare del \textit{payload} della probe l'RTT aumenta, perché è necessario dover immettere sulla rete un numero sempre 
-crescente di \textit{byte}, aumentando il valore del ritardo di trasmissione, che anch'esso va ad aumentare il valore dell'RTT.\newline
+crescente di byte, aumentando il valore del ritardo di trasmissione, che anch'esso va ad aumentare il valore dell'RTT.\newline
 Contrariamente alle aspettative, però, all'aumentare delle dimensioni del messaggio, il \textit{throughput} aumenta e non diminuisce. Questo perché
 l'aumento dei dati trasmessi è sempre maggiore dell'aumento subito dall'RTT per trasportare più dati.
 
 \begin{figure}[H]
 	\centering
 	\includegraphics[width=\linewidth]{images/delay.png}
-	\caption{Grafici con i test effettuati con ``server delay" posto ad un secondo}
+	\caption{Grafici con i test effettuati con ``\textit{server delay}" posto ad un secondo}
 \end{figure}
 
 Aggiungendo un ``\textit{server delay}" di un secondo, le osservazioni fatte in precedenza rimangono inalterate. Fa eccezione il quarto grafico della
 prima riga dove la linea di tendenza ha pendenza negativa anziché positiva, ma questo è dovuto al primo punto che è molto in alto rispetto
-agli altri, mentre gli altri sono pressoché allineati in maniera crescente, permettendo di etichettarlo come un dato fuori scala.\newline
-L'uso di un ``\textit{server delay}" così alto rispetto ai valori degli RTT misurati senza \textit{delay} riesce però nell'uniformare i valori
+agli altri, mentre gli altri sono pressoché allineati in maniera crescente, permettendo di etichettarlo come un dato trascurabile.\newline
+L'uso di un ``\textit{server delay}" così alto rispetto ai valori degli RTT misurati senza \textit{delay} riesce però nell'uniformare l'ordine di grandezza 
 del \textit{throughput}.
 
 \end{document}
