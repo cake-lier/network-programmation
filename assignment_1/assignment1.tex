@@ -22,11 +22,11 @@
 
 \chapter{Task Uno}
 
-Per lo svolgimento del \textit{task} qui di seguito abbiamo fatto riferimento il \textit{file} "task1.pcapng".
+Per lo svolgimento del \textit{task} qui di seguito abbiamo fatto riferimento al \textit{file} "task1.pcapng".
 
 \section{Fase Zero}
 
-Si sceglie l’interfaccia di connessione adoperata dal computer accedere a Internet, sulla quale si effettua la cattura di pacchetti.
+Si sceglie l’interfaccia di connessione adoperata dal computer per accedere a Internet, sulla quale si effettua la cattura di pacchetti.
 
 \begin{figure}[H]
 	\centering
@@ -41,7 +41,7 @@ Avviata la cattura, si imposta il filtro ``tcp.port == 21" per filtrare i pacche
 filtrare i prossimi pacchetti, indipendentemente dalle porte coinvolte, tramite il filtro ``ip.addr == $<$server-IP-address$>$". Dal terminale, l'utente, utilizzando il \textit{client}, esegue il
 comando ``ftp ftp.ubuntu.com" per iniziare la connessione; su Wireshark, si nota che il \textit{client}, da una propria porta impostata autonomamente, invia la richiesta di connessione alla porta
 21 del server specificato. Una volta stabilita la connessione - la cosiddetta \textit{command connection} - sulla porta 21, il \textit{server} richiede al \textit{client} di inserire \textit{username}
-e \textit{password}, dopo che l'utente li ha forniti, il \textit{login} è completato. Anche questo scambio di pacchetti avviene sulla porta 21 del \textit{server}.
+e \textit{password}. Dopo che l'utente li ha forniti, il \textit{login} è completato. Anche questo scambio di pacchetti avviene sulla porta 21 del \textit{server}.
 
 \begin{figure}[H]
 	\centering

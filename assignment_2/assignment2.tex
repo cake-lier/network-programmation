@@ -59,7 +59,7 @@ un commento che ne espliciti il funzionamento.
     quella scelta è la \textit{socket} restituita dalla funzione ``\textit{accept}", mentre quella nel vettore viene chiusa. Infine, il processo figlio sostituisce il proprio
     eseguibile binario con quello del servizio richiesto mediante la funzione ``\textit{execle}"
     \item Nel frattempo, il processo padre, qualora la socket pronta fosse di tipo \textit{TCP}, chiude la \textit{socket} per la comunicazione creata dalla funzione ``\textit{accept}".
-    In seguito, in caso il servizio richiesto fosse avesse modalità ``\textit{wait}", rimuove dal \textit{set} dei ``\textit{socket file descriptor}" la socket appena entrata in
+    In seguito, in caso il servizio richiesto fosse in modalità ``\textit{wait}", rimuove dal \textit{set} dei ``\textit{socket file descriptor}" la socket appena entrata in
     uso. In questo modo, nessuno potrà più richiedere quel servizio fino a che l'utilizzo da parte del \textit{client} corrente non sarà terminato. 
 \end{itemize}
 
